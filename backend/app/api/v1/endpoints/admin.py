@@ -1,0 +1,136 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+from pydantic import BaseModel, EmailStr
+from typing import Optional
+import uuid
+
+from app.db.session import get_db
+from app.core.deps import get_current_user, require_roles
+from app.models.models import User, Department, UserRole
+from app.services.auth.auth_service import hash_password
+
+router = APIRouter(prefix="/admin", tags=["admin"])
+
+AdminOnly = require_roles("admin", "super_admin")
+
+
+def _user_dict(u: User) -> dict:
+    return {
+        "id":                str(u.id),
+        "email":             u.email,
+        "full_name":         u.full_name,
+        "role":              u.role.value if hasattr(u.role, "value") else str(u.role),
+        "employee_id":       u.employee_id,
+        "department_id":     u.department_id,
+        "department_name":   u.department.name if u.department else None,
+        "agent_departments": u.agent_departments or [],
+        "agent_role_key":    u.agent_role_key,
+        "job_title":         u.job_title,
+        "is_active":         u.is_active,
+        "created_at":        u.created_at.isoformat() if u.created_at else None,
+    }
+
+
+@router.get("/users")
+async def list_users(
+    _:  User = Depends(AdminOnly),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(User).options(selectinload(User.department)).order_by(User.created_at)
+    )
+    return [_user_dict(u) for u in result.scalars().all()]
+
+
+class CreateUserRequest(BaseModel):
+    email: EmailStr
+    full_name: str
+    password: str
+    role: str
+    department_id: Optional[str] = None
+    agent_departments: Optional[list] = None
+    agent_role_key: Optional[str] = None
+    job_title: Optional[str] = None
+    employee_id: Optional[str] = None
+
+
+@router.post("/users")
+async def create_user(
+    req: CreateUserRequest,
+    _:   User = Depends(AdminOnly),
+    db:  AsyncSession = Depends(get_db),
+):
+    existing = await db.execute(select(User).where(User.email == req.email))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Email already exists")
+
+    user = User(
+        email             = req.email,
+        full_name         = req.full_name,
+        hashed_password   = hash_password(req.password),
+        role              = UserRole(req.role),
+        department_id     = req.department_id,
+        agent_departments = req.agent_departments or [],
+        agent_role_key    = req.agent_role_key,
+        job_title         = req.job_title,
+        employee_id       = req.employee_id,
+    )
+    db.add(user)
+    await db.flush()
+    return _user_dict(user)
+
+
+@router.patch("/users/{user_id}")
+async def update_user(
+    user_id: str,
+    req:     dict,
+    _:       User = Depends(AdminOnly),
+    db:      AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(User).options(selectinload(User.department)).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    for field in ("full_name", "job_title", "agent_role_key", "agent_departments", "is_active"):
+        if field in req:
+            setattr(user, field, req[field])
+
+    return _user_dict(user)
+
+
+@router.get("/departments")
+async def list_departments(
+    _:  User = Depends(AdminOnly),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Department).order_by(Department.name))
+    return [
+        {
+            "id":                str(d.id),
+            "name":              d.name,
+            "slug":              d.slug,
+            "color":             d.color,
+            "description":       d.description,
+            "routed_agent_role": d.routed_agent_role,
+            "is_active":         d.is_active,
+        }
+        for d in result.scalars().all()
+    ]
+
+
+@router.get("/system-stats")
+async def system_stats(
+    _:  User = Depends(AdminOnly),
+    db: AsyncSession = Depends(get_db),
+):
+    from sqlalchemy import func
+    from app.models.models import Ticket
+    total_users   = await db.execute(select(func.count(User.id)))
+    total_tickets = await db.execute(select(func.count(Ticket.id)))
+    return {
+        "total_users":   total_users.scalar() or 0,
+        "total_tickets": total_tickets.scalar() or 0,
+    }

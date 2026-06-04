@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+
+# Database (local SQLite)
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+
+# Environment files — NEVER commit these
+backend/.env
+frontend/.env.local
+.env
+
+# Node
+node_modules/
+.next/
+out/
+.npm
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Render
+.render-buildpacks.json

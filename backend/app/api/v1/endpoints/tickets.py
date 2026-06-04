@@ -1,0 +1,310 @@
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime, timezone
+import uuid
+
+from app.db.session import get_db
+from app.core.deps import get_current_user, is_admin, is_agent
+from app.models.models import Ticket, TicketStatus, User, TicketComment, AuditLog
+from app.services.tickets.ticket_service import create_ticket, get_tickets_for_user
+from app.services.ai.groq_service import generate_ai_reply
+
+router = APIRouter(prefix="/tickets", tags=["tickets"])
+
+
+def _ticket_to_dict(t: Ticket) -> dict:
+    ai = t.ai_classification or {}
+    return {
+        "id":              t.id,
+        "ticket_number":   t.ticket_number,
+        "title":           t.title,
+        "description":     t.description,
+        "status":          t.status.value if hasattr(t.status, "value") else str(t.status),
+        "priority":        t.priority.value if hasattr(t.priority, "value") else str(t.priority),
+        "is_escalated":    t.is_escalated,
+        "sla_deadline":    t.sla_deadline.isoformat() if t.sla_deadline else None,
+        "sla_breached":    t.sla_breached,
+        "resolution_note": t.resolution_note,
+        "created_at":      t.created_at.isoformat() if t.created_at else None,
+        "updated_at":      t.updated_at.isoformat() if t.updated_at else None,
+        "resolved_at":     t.resolved_at.isoformat() if t.resolved_at else None,
+        "department": {
+            "id":    t.department.id,
+            "name":  t.department.name,
+            "slug":  t.department.slug,
+            "color": t.department.color,
+        } if t.department else None,
+        "submitter": {
+            "id":        t.submitter.id,
+            "full_name": t.submitter.full_name,
+            "email":     t.submitter.email,
+        } if t.submitter else None,
+        "assigned_agent": {
+            "id":             t.assigned_agent.id,
+            "full_name":      t.assigned_agent.full_name,
+            "agent_role_key": t.assigned_agent.agent_role_key,
+        } if t.assigned_agent else None,
+        # Full AI routing intelligence exposed to the frontend
+        "ai": {
+            "department_slug":      ai.get("department_slug"),
+            "category":             ai.get("category"),
+            "sentiment":            ai.get("sentiment"),
+            "confidence":           ai.get("selection_confidence"),
+            "summary":              ai.get("summary"),
+            "priority_reason":      ai.get("priority_reason"),
+            # Tokenization data
+            "skill_tokens":         ai.get("skill_tokens", []),
+            "token_weights":        ai.get("token_weights", {}),
+            "token_match_score":    ai.get("token_match_score"),
+            # Routing decision
+            "routed_to_role":       ai.get("routed_to_role"),
+            "routed_to_agent_name": ai.get("routed_to_agent_name"),
+            "routing_rationale":    ai.get("routing_rationale"),
+            "selected_by":          ai.get("selected_by"),
+            "classified_by":        ai.get("classified_by"),
+        },
+    }
+
+
+class CreateTicketRequest(BaseModel):
+    title: str
+    description: str
+
+
+class UpdateStatusRequest(BaseModel):
+    status: str
+    resolution_note: Optional[str] = None
+
+
+class AssignRequest(BaseModel):
+    agent_id: str
+
+
+class EscalateRequest(BaseModel):
+    reason: str
+
+
+class CommentRequest(BaseModel):
+    content: str
+    is_internal: bool = False
+
+
+@router.get("/")
+async def list_tickets(
+    status:       Optional[str] = Query(None),
+    priority:     Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db),
+):
+    params = {}
+    if status:   params["status"]   = status
+    if priority: params["priority"] = priority
+    tickets = await get_tickets_for_user(db, current_user, params)
+    return {"tickets": [_ticket_to_dict(t) for t in tickets], "total": len(tickets)}
+
+
+@router.post("/")
+async def create_new_ticket(
+    req:          CreateTicketRequest,
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db),
+):
+    role_val = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
+    if role_val not in ("employee", "admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Only employees can submit tickets")
+
+    ticket = await create_ticket(db, req.title, req.description, current_user.id)
+
+    db.add(AuditLog(
+        id=str(uuid.uuid4()),
+        ticket_id=ticket.id,
+        user_id=current_user.id,
+        action="ticket_created",
+        details={
+            "title":            req.title,
+            "ai_dept":          (ticket.ai_classification or {}).get("department_slug"),
+            "ai_agent":         (ticket.ai_classification or {}).get("routed_to_agent_name"),
+            "token_match_score":(ticket.ai_classification or {}).get("token_match_score"),
+        },
+    ))
+
+    return _ticket_to_dict(ticket)
+
+
+@router.get("/{ticket_id}")
+async def get_ticket(
+    ticket_id:    str,
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Ticket)
+        .options(
+            selectinload(Ticket.department),
+            selectinload(Ticket.submitter),
+            selectinload(Ticket.assigned_agent),
+            selectinload(Ticket.comments).selectinload(TicketComment.author),
+        )
+        .where(Ticket.id == ticket_id)
+    )
+    ticket = result.scalar_one_or_none()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    data = _ticket_to_dict(ticket)
+    data["comments"] = [
+        {
+            "id":          c.id,
+            "content":     c.content,
+            "is_internal": c.is_internal,
+            "is_ai":       c.is_ai,
+            "created_at":  c.created_at.isoformat(),
+            "author": {
+                "full_name": c.author.full_name,
+                "role":      c.author.role.value if c.author else "unknown",
+            } if c.author else None,
+        }
+        for c in sorted(ticket.comments, key=lambda x: x.created_at)
+    ]
+    return data
+
+
+@router.patch("/{ticket_id}/status")
+async def update_status(
+    ticket_id:    str,
+    req:          UpdateStatusRequest,
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Ticket).options(
+            selectinload(Ticket.department),
+            selectinload(Ticket.submitter),
+            selectinload(Ticket.assigned_agent),
+        ).where(Ticket.id == ticket_id)
+    )
+    ticket = result.scalar_one_or_none()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    try:
+        ticket.status = TicketStatus(req.status)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid status: {req.status}")
+
+    if req.resolution_note:
+        ticket.resolution_note = req.resolution_note
+    if req.status in ("resolved", "closed"):
+        ticket.resolved_at = datetime.now(timezone.utc)
+
+    db.add(AuditLog(
+        id=str(uuid.uuid4()),
+        ticket_id=ticket.id,
+        user_id=current_user.id,
+        action="status_changed",
+        details={"new_status": req.status},
+    ))
+    return _ticket_to_dict(ticket)
+
+
+@router.patch("/{ticket_id}/assign")
+async def assign_ticket(
+    ticket_id:    str,
+    req:          AssignRequest,
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db),
+):
+    if not (is_agent(current_user) or is_admin(current_user)):
+        raise HTTPException(status_code=403, detail="Only agents/admins can assign tickets")
+
+    result = await db.execute(
+        select(Ticket).options(
+            selectinload(Ticket.department),
+            selectinload(Ticket.submitter),
+            selectinload(Ticket.assigned_agent),
+        ).where(Ticket.id == ticket_id)
+    )
+    ticket = result.scalar_one_or_none()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    ticket.assigned_agent_id = req.agent_id
+    ticket.status = TicketStatus.assigned
+    return _ticket_to_dict(ticket)
+
+
+@router.post("/{ticket_id}/escalate")
+async def escalate_ticket(
+    ticket_id:    str,
+    req:          EscalateRequest,
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Ticket).options(
+            selectinload(Ticket.department),
+            selectinload(Ticket.submitter),
+            selectinload(Ticket.assigned_agent),
+        ).where(Ticket.id == ticket_id)
+    )
+    ticket = result.scalar_one_or_none()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    ticket.is_escalated = True
+    ticket.status = TicketStatus.escalated
+    db.add(AuditLog(
+        id=str(uuid.uuid4()),
+        ticket_id=ticket.id,
+        user_id=current_user.id,
+        action="ticket_escalated",
+        details={"reason": req.reason},
+    ))
+    return _ticket_to_dict(ticket)
+
+
+@router.post("/{ticket_id}/comments")
+async def add_comment(
+    ticket_id:    str,
+    req:          CommentRequest,
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db),
+):
+    comment = TicketComment(
+        id=str(uuid.uuid4()),
+        ticket_id=ticket_id,
+        author_id=current_user.id,
+        content=req.content,
+        is_internal=req.is_internal,
+    )
+    db.add(comment)
+    await db.flush()
+    return {
+        "id":          comment.id,
+        "content":     comment.content,
+        "is_internal": comment.is_internal,
+        "created_at":  comment.created_at.isoformat(),
+    }
+
+
+@router.get("/{ticket_id}/ai-reply")
+async def get_ai_reply(
+    ticket_id:    str,
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Ticket).options(selectinload(Ticket.department)).where(Ticket.id == ticket_id)
+    )
+    ticket = result.scalar_one_or_none()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    dept_name = ticket.department.name if ticket.department else "Support"
+    category  = (ticket.ai_classification or {}).get("category", "General")
+    reply = await generate_ai_reply(ticket.title, ticket.description, dept_name, category)
+    return {"reply": reply}
