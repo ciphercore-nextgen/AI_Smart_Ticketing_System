@@ -308,3 +308,75 @@ async def get_ai_reply(
     category  = (ticket.ai_classification or {}).get("category", "General")
     reply = await generate_ai_reply(ticket.title, ticket.description, dept_name, category)
     return {"reply": reply}
+
+
+# ─── Automated Response Endpoints ─────────────────────────────────────────────
+
+from app.services.ai.response_service import generate_auto_response, generate_all_tones
+
+class AutoResponseRequest(BaseModel):
+    tone:    str = "formal"   # formal | friendly | urgent
+    trigger: str = "agent_reply"
+
+
+@router.post("/{ticket_id}/auto-response")
+async def auto_response(
+    ticket_id:    str,
+    req:          AutoResponseRequest,
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db),
+):
+    """Generate a single auto-response in the requested tone."""
+    result = await db.execute(
+        select(Ticket).options(selectinload(Ticket.department)).where(Ticket.id == ticket_id)
+    )
+    ticket = result.scalar_one_or_none()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    ai    = ticket.ai_classification or {}
+    role  = current_user.agent_role_key if hasattr(current_user, "agent_role_key") else "admin"
+    tone  = req.tone if req.tone in ("formal", "friendly", "urgent") else "formal"
+
+    from app.services.ai.response_service import generate_auto_response as _gen
+    resp = await _gen(
+        title       = ticket.title,
+        description = ticket.description,
+        category    = ai.get("category", "General Support"),
+        department  = ticket.department.name if ticket.department else "Support",
+        priority    = ticket.priority.value if hasattr(ticket.priority, "value") else str(ticket.priority),
+        tone        = tone,
+        agent_role  = role or "admin",
+        trigger     = req.trigger,
+    )
+    return resp
+
+
+@router.get("/{ticket_id}/auto-response/all-tones")
+async def auto_response_all_tones(
+    ticket_id:    str,
+    trigger:      str = "agent_reply",
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db),
+):
+    """Generate responses in all 3 tones at once — for the tone-picker UI."""
+    result = await db.execute(
+        select(Ticket).options(selectinload(Ticket.department)).where(Ticket.id == ticket_id)
+    )
+    ticket = result.scalar_one_or_none()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    ai   = ticket.ai_classification or {}
+    role = current_user.agent_role_key if hasattr(current_user, "agent_role_key") else "admin"
+
+    resp = await generate_all_tones(
+        title       = ticket.title,
+        description = ticket.description,
+        category    = ai.get("category", "General Support"),
+        department  = ticket.department.name if ticket.department else "Support",
+        priority    = ticket.priority.value if hasattr(ticket.priority, "value") else str(ticket.priority),
+        agent_role  = role or "admin",
+        trigger     = trigger,
+    )
+    return resp
