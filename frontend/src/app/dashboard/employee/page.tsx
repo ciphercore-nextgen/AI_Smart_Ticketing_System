@@ -5,7 +5,7 @@ import KPICard from '@/components/ui/KPICard'
 import { ticketsApi, analyticsApi } from '@/lib/api'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-import { Ticket, Clock, CheckCircle, AlertTriangle, Plus, ChevronRight } from 'lucide-react'
+import { Ticket, Clock, CheckCircle, AlertTriangle, Plus, ChevronRight, Sparkles, Cpu } from 'lucide-react'
 import { PriorityBadge, StatusBadge } from '@/components/ui/TicketBadge'
 import { formatDistanceToNow } from 'date-fns'
 import { useAuthStore } from '@/stores/authStore'
@@ -38,6 +38,25 @@ export default function EmployeeDashboard() {
           <KPICard title="Resolved"        value={resolved}   icon={CheckCircle}  color="green"  index={2} />
           <KPICard title="Escalated"       value={escalated}  icon={AlertTriangle} color="red"   index={3} />
         </div>
+
+        {/* AI auto-response info */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.15 }}
+          className="glass-card rounded-xl p-4 border border-blue-500/20 flex items-start gap-3"
+        >
+          <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <Sparkles className="w-4 h-4 text-blue-400" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-white">AI-Powered Support Active</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              When you submit a ticket, our AI instantly reads it, routes it to the right agent,
+              and sends you an automated first response. Open any ticket to see the thread.
+            </p>
+          </div>
+        </motion.div>
 
         {/* Quick actions */}
         <div className="glass-card rounded-xl p-5 border border-gray-800/60">
@@ -83,6 +102,11 @@ export default function EmployeeDashboard() {
                     <div className="flex items-center gap-2 flex-shrink-0 ml-4">
                       <PriorityBadge priority={t.priority} />
                       <StatusBadge status={t.status} />
+                      {(t.comments || []).some((c: any) => c.is_ai) && (
+                        <span className="hidden sm:flex items-center gap-1 text-xs text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">
+                          <Sparkles className="w-3 h-3" /> AI replied
+                        </span>
+                      )}
                       <span className="text-xs text-gray-600 hidden sm:block">
                         {t.created_at ? formatDistanceToNow(new Date(t.created_at), { addSuffix: true }) : ''}
                       </span>
