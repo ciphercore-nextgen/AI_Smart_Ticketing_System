@@ -62,6 +62,7 @@ export const ticketsApi = {
     api.post(`/tickets/${id}/auto-response`, { tone, trigger }),
   autoResponseAllTones: (id: string, trigger = 'agent_reply') =>
     api.get(`/tickets/${id}/auto-response/all-tones?trigger=${trigger}`),
+  selfHelp: (id: string) => api.get(`/tickets/${id}/self-help`),
 }
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
