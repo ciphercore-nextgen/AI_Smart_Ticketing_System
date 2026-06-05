@@ -275,3 +275,154 @@ def _match_template(category: str) -> str:
         if key in category_lower:
             return template
     return "General Support"
+
+
+# ─── Self-Help Suggestions Engine ────────────────────────────────────────────
+
+SELF_HELP_SYSTEM_PROMPT = """You are TicketIQ's self-help engine for enterprise employees.
+
+A support ticket was just submitted. Your job is to give the employee
+3–5 practical things they can try RIGHT NOW while waiting for the agent.
+
+RULES:
+1. Be specific to their exact problem — no generic advice
+2. Each step must be immediately actionable (no "contact IT" — they already did)
+3. Order by easiest/fastest first
+4. If a step is risky (e.g. reinstall), flag it with a warning
+5. Include an estimated time for each step e.g. "2 min"
+6. Keep each step under 20 words
+7. Add a "success indicator" — how they'll know if it worked
+
+Respond ONLY with valid JSON:
+{
+  "can_self_resolve": true/false,
+  "confidence": 0.0-1.0,
+  "summary": "one sentence: what this problem likely is",
+  "steps": [
+    {
+      "order": 1,
+      "title": "Short action title",
+      "instruction": "Exact step to take",
+      "time_estimate": "2 min",
+      "risk": "none|low|medium",
+      "success_indicator": "How you know it worked"
+    }
+  ],
+  "escalate_if": "condition under which they should not wait and escalate immediately",
+  "useful_links": [
+    {"label": "link label", "url": "real URL if applicable or null"}
+  ]
+}"""
+
+
+SELF_HELP_FALLBACK: dict[str, list[dict]] = {
+    "vpn": [
+        {"order": 1, "title": "Restart VPN client",          "instruction": "Fully quit and reopen your VPN application",                       "time_estimate": "1 min",  "risk": "none",   "success_indicator": "VPN connects and shows green status"},
+        {"order": 2, "title": "Check internet connection",    "instruction": "Open a browser and go to google.com to confirm internet works",     "time_estimate": "30 sec", "risk": "none",   "success_indicator": "Page loads normally"},
+        {"order": 3, "title": "Switch network",               "instruction": "Try connecting from a different WiFi network or mobile hotspot",    "time_estimate": "2 min",  "risk": "none",   "success_indicator": "VPN connects on alternate network"},
+        {"order": 4, "title": "Flush DNS cache",              "instruction": "Run: ipconfig /flushdns in Command Prompt as Administrator",        "time_estimate": "2 min",  "risk": "low",    "success_indicator": "VPN connects after DNS flush"},
+        {"order": 5, "title": "Check VPN server status",      "instruction": "Ask a colleague if their VPN is working — may be a server issue",  "time_estimate": "1 min",  "risk": "none",   "success_indicator": "Colleague confirms same issue = server side"},
+    ],
+    "password": [
+        {"order": 1, "title": "Try password reset portal",    "instruction": "Go to your company's self-service password reset portal",          "time_estimate": "3 min",  "risk": "none",   "success_indicator": "New password works on login"},
+        {"order": 2, "title": "Check CAPS LOCK",              "instruction": "Ensure Caps Lock is off and try your password again",              "time_estimate": "30 sec", "risk": "none",   "success_indicator": "Login succeeds"},
+        {"order": 3, "title": "Try Incognito window",         "instruction": "Open a private/incognito browser window and try logging in",       "time_estimate": "1 min",  "risk": "none",   "success_indicator": "Login succeeds in private window"},
+        {"order": 4, "title": "Clear browser cache",          "instruction": "Press Ctrl+Shift+Delete → clear cookies and cache → retry login",  "time_estimate": "2 min",  "risk": "low",    "success_indicator": "Login page refreshes and works"},
+    ],
+    "laptop": [
+        {"order": 1, "title": "Restart your laptop",          "instruction": "Save all work, then do a full restart (not sleep/hibernate)",       "time_estimate": "3 min",  "risk": "none",   "success_indicator": "Issue doesn't reappear after restart"},
+        {"order": 2, "title": "Free up disk space",           "instruction": "Open File Explorer → right-click C: drive → Properties → Disk Cleanup", "time_estimate": "5 min", "risk": "low", "success_indicator": "Storage below 90%, laptop runs faster"},
+        {"order": 3, "title": "Close background apps",        "instruction": "Press Ctrl+Shift+Esc → end tasks using high CPU/memory",           "time_estimate": "2 min",  "risk": "low",    "success_indicator": "CPU usage drops below 50%"},
+        {"order": 4, "title": "Check for Windows updates",    "instruction": "Settings → Windows Update → check for pending updates",            "time_estimate": "5 min",  "risk": "low",    "success_indicator": "No pending updates blocking performance"},
+    ],
+    "leave": [
+        {"order": 1, "title": "Check HR portal first",        "instruction": "Log into the HR portal and check if leave can be submitted directly", "time_estimate": "2 min", "risk": "none",  "success_indicator": "Leave request submitted without agent help"},
+        {"order": 2, "title": "Check leave balance",          "instruction": "In the HR portal → My Leave → check your current balance",          "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Balance confirmed before agent reviews"},
+        {"order": 3, "title": "Notify your manager directly", "instruction": "Email your direct manager about the planned leave dates now",        "time_estimate": "2 min",  "risk": "none",  "success_indicator": "Manager acknowledged — process can proceed"},
+    ],
+    "expense": [
+        {"order": 1, "title": "Check receipts are attached",  "instruction": "Open your expense claim and verify all receipts are uploaded",       "time_estimate": "2 min",  "risk": "none",  "success_indicator": "All receipts visible in the claim"},
+        {"order": 2, "title": "Check claim amount limits",    "instruction": "Review the expense policy for per-item and daily limits",            "time_estimate": "2 min",  "risk": "none",  "success_indicator": "Claim is within policy limits"},
+        {"order": 3, "title": "Verify expense category",      "instruction": "Ensure the correct expense category is selected on the claim",       "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Category matches the type of expense"},
+    ],
+    "email": [
+        {"order": 1, "title": "Check email server status",    "instruction": "Ask a colleague if their email is working",                         "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Colleague confirms same issue = server side"},
+        {"order": 2, "title": "Restart Outlook",              "instruction": "Fully close Outlook (check system tray) and reopen it",             "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Emails load and sync normally"},
+        {"order": 3, "title": "Check account settings",       "instruction": "File → Account Settings → verify your account shows Connected",     "time_estimate": "2 min",  "risk": "none",  "success_indicator": "Account status shows Connected"},
+        {"order": 4, "title": "Clear Outlook cache",          "instruction": "Close Outlook → delete OST file in AppData → reopen Outlook",       "time_estimate": "10 min", "risk": "medium","success_indicator": "Outlook rebuilds and syncs successfully"},
+    ],
+    "printer": [
+        {"order": 1, "title": "Restart printer",              "instruction": "Turn printer off, wait 10 seconds, turn back on",                   "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Printer ready light is solid green"},
+        {"order": 2, "title": "Clear print queue",            "instruction": "Settings → Printers → right-click printer → See what's printing → cancel all", "time_estimate": "2 min", "risk": "none", "success_indicator": "Print queue is empty"},
+        {"order": 3, "title": "Reconnect to printer",         "instruction": "Settings → Printers → remove printer → Add a printer → re-add it", "time_estimate": "3 min",  "risk": "low",   "success_indicator": "Test page prints successfully"},
+    ],
+    "facilities": [
+        {"order": 1, "title": "Check if others affected",     "instruction": "Ask nearby colleagues if they have the same issue",                  "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Determine if it's isolated or widespread"},
+        {"order": 2, "title": "Document the issue",           "instruction": "Take a photo of the problem to share with the agent",               "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Photo ready to attach to ticket"},
+        {"order": 3, "title": "Check if safety risk",         "instruction": "If it's a safety hazard, contact reception or security immediately", "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Safety issue escalated to correct team"},
+    ],
+    "general": [
+        {"order": 1, "title": "Restart the affected system",  "instruction": "A full restart resolves many common issues",                        "time_estimate": "3 min",  "risk": "none",  "success_indicator": "Issue doesn't reappear after restart"},
+        {"order": 2, "title": "Check for known outages",      "instruction": "Ask a colleague if they have the same issue",                       "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Determine if issue is widespread"},
+        {"order": 3, "title": "Document the error",           "instruction": "Take a screenshot of any error messages before they disappear",     "time_estimate": "30 sec", "risk": "none",  "success_indicator": "Error captured and ready to share with agent"},
+    ],
+}
+
+
+async def generate_self_help(
+    title: str,
+    description: str,
+    category: str,
+    department: str,
+    priority: str,
+) -> dict:
+    """
+    Generate self-help steps the employee can try immediately while waiting.
+    Uses GROQ for context-aware steps, falls back to keyword-matched templates.
+    """
+    if settings.GROQ_API_KEY and not settings.GROQ_API_KEY.startswith("gsk_your"):
+        try:
+            from groq import AsyncGroq
+            groq = AsyncGroq(api_key=settings.GROQ_API_KEY)
+            response = await groq.chat.completions.create(
+                model=settings.GROQ_MODEL,
+                messages=[
+                    {"role": "system", "content": SELF_HELP_SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Department: {department}\n"
+                            f"Category: {category}\n"
+                            f"Priority: {priority}\n"
+                            f"Title: {title}\n\n"
+                            f"Description:\n{description}"
+                        ),
+                    },
+                ],
+                temperature=0.2,
+                max_tokens=800,
+                response_format={"type": "json_object"},
+            )
+            result = json.loads(response.choices[0].message.content)
+            result["generated_by"] = "groq"
+            return result
+        except Exception as e:
+            print(f"[SelfHelp] GROQ failed: {e} — using fallback")
+
+    # Keyword fallback
+    text = (title + " " + description + " " + category).lower()
+    key = "general"
+    for k in ["vpn", "password", "laptop", "leave", "expense", "email", "printer", "facilities"]:
+        if k in text:
+            key = k
+            break
+
+    return {
+        "can_self_resolve": key != "general",
+        "confidence":       0.70,
+        "summary":          f"Common {category} issue — try these steps while your ticket is being reviewed.",
+        "steps":            SELF_HELP_FALLBACK[key],
+        "escalate_if":      "Issue involves data loss, security breach, or complete work blockage",
+        "useful_links":     [],
+        "generated_by":     "template",
+    }

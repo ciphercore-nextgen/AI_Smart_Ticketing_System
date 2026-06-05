@@ -380,3 +380,32 @@ async def auto_response_all_tones(
         trigger     = trigger,
     )
     return resp
+
+
+@router.get("/{ticket_id}/self-help")
+async def get_self_help(
+    ticket_id:    str,
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db),
+):
+    """Return AI-generated self-help steps for the employee to try while waiting."""
+    result = await db.execute(
+        select(Ticket).options(selectinload(Ticket.department)).where(Ticket.id == ticket_id)
+    )
+    ticket = result.scalar_one_or_none()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    ai       = ticket.ai_classification or {}
+    dept     = ticket.department.name if ticket.department else "Support"
+    category = ai.get("category", "General Support")
+    priority = ticket.priority.value if hasattr(ticket.priority, "value") else str(ticket.priority)
+
+    from app.services.ai.response_service import generate_self_help
+    return await generate_self_help(
+        title       = ticket.title,
+        description = ticket.description,
+        category    = category,
+        department  = dept,
+        priority    = priority,
+    )
