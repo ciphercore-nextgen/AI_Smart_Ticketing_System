@@ -58,6 +58,10 @@ export const ticketsApi = {
   addComment:   (id: string, content: string, is_internal: boolean) =>
     api.post(`/tickets/${id}/comments`, { content, is_internal }),
   getAiReply:   (id: string)                       => api.get(`/tickets/${id}/ai-reply`),
+  autoResponse: (id: string, tone: string, trigger: string) =>
+    api.post(`/tickets/${id}/auto-response`, { tone, trigger }),
+  autoResponseAllTones: (id: string, trigger = 'agent_reply') =>
+    api.get(`/tickets/${id}/auto-response/all-tones?trigger=${trigger}`),
 }
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
