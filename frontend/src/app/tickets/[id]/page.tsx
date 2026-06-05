@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/shared/DashboardLayout'
 import { PriorityBadge, StatusBadge, DepartmentBadge } from '@/components/ui/TicketBadge'
 import AutoResponsePanel from '@/components/ui/AutoResponsePanel'
+import SelfHelpPanel from '@/components/ui/SelfHelpPanel'
 import { ticketsApi } from '@/lib/api'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -27,7 +28,7 @@ export default function TicketDetailPage() {
   const [posting, setPosting]             = useState(false)
   const [statusChanging, setStatusChanging] = useState(false)
 
-  const role = (user as any)?.agent_role_key || user?.role || 'employee'
+  const role = user?.role || 'employee'
   const isAgentOrAdmin = ['ai_intern','it_support_technician','junior_operations','admin','super_admin'].includes(role)
 
   const load = async () => {
@@ -145,6 +146,9 @@ export default function TicketDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Self-Help Panel — always shown to employees, also useful for agents */}
+        <SelfHelpPanel ticketId={id} autoLoad={!isAgentOrAdmin} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* AI Classification */}
