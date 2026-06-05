@@ -15,8 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
-from app.models.models import Ticket, TicketStatus, TicketPriority, User, Department
+from app.models.models import Ticket, TicketStatus, TicketPriority, User, Department, TicketComment
 from app.services.ai.groq_service import classify_ticket, select_agent_for_ticket
+from app.services.ai.response_service import generate_auto_response
 
 SLA_HOURS = {"critical": 4, "high": 24, "medium": 72, "low": 168}
 
@@ -121,6 +122,31 @@ async def create_ticket(
 
     db.add(ticket)
     await db.flush()
+
+    # ── Auto-Response: post first AI comment immediately ──────────────────────
+    try:
+        import uuid as _uuid
+        auto_resp = await generate_auto_response(
+            title      = title,
+            description= description,
+            category   = classification.get("category", "General Support"),
+            department = department.name if department else "Support",
+            priority   = priority_str,
+            tone       = "formal",
+            agent_role = classification.get("routed_to_role", "admin"),
+            trigger    = "new_ticket",
+        )
+        db.add(TicketComment(
+            id         = str(_uuid.uuid4()),
+            ticket_id  = ticket.id,
+            author_id  = submitter_id,
+            content    = auto_resp["response"],
+            is_internal= False,
+            is_ai      = True,
+        ))
+        await db.flush()
+    except Exception as e:
+        print(f"[AutoResponse] First-response failed: {e}")
 
     result = await db.execute(
         select(Ticket)
