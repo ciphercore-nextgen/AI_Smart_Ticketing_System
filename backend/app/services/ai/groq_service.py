@@ -76,11 +76,30 @@ Operations tokens: office, facilities, maintenance, repair, building, desk, chai
   vendor, supplier, procurement, purchase_request, company_vehicle, fleet,
   asset_management, health_safety, fire_safety, first_aid, incident
 
-PRIORITY:
-- critical: system outage, data loss, security breach, payroll failure, medical emergency
-- high: blocking work, urgent deadline, senior employee, escalating issue
-- medium: standard request, normal business impact
-- low: non-urgent, nice-to-have, easily worked around
+PRIORITY DETECTION — read the content carefully, don't default to medium:
+
+CRITICAL (assign immediately — 4hr SLA):
+  Keywords/signals: "not working at all", "completely blocked", "server down", "system down",
+  "data loss", "data breach", "security incident", "hacked", "ransomware", "virus",
+  "payroll not processed", "salaries not paid", "production down", "outage",
+  "medical emergency", "safety hazard", "fire", "flooding", "injury",
+  "urgent urgent", "emergency", "ASAP", "immediately", "right now",
+  "cannot work at all", "whole team affected", "entire company", "everyone impacted"
+
+HIGH (respond within 24hrs):
+  Keywords/signals: "blocking my work", "cannot complete", "deadline today", "due tomorrow",
+  "client presentation", "meeting in an hour", "manager waiting", "customer affected",
+  "expense not reimbursed for weeks", "payslip wrong", "overpaid", "underpaid",
+  "VPN down" (if working remotely), "email not working", "can't access system",
+  "multiple people affected", "team blocked", "frustrated", "escalating"
+
+MEDIUM (respond within 3 days):
+  Standard requests with normal business impact. Single person affected.
+  Can work around the issue temporarily. No immediate deadline pressure.
+
+LOW (respond within a week):
+  Non-urgent. Nice-to-have. Easy workaround exists. Future planning.
+  Examples: leave requests for distant dates, general policy questions, minor improvements
 
 Respond ONLY with valid JSON — no markdown, no explanation:
 {
