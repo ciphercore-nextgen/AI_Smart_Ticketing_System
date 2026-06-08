@@ -5,6 +5,7 @@ import KPICard from '@/components/ui/KPICard'
 import { analyticsApi, ticketsApi } from '@/lib/api'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Ticket, Clock, CheckCircle, AlertTriangle, Users, Building2,
   TrendingUp, ChevronRight, Cpu, Shield
@@ -25,6 +26,7 @@ export default function AdminDashboard() {
   const [deptData, setDeptData] = useState<any[]>([])
   const [priorityData, setPriorityData] = useState<any[]>([])
   const [tickets, setTickets] = useState<any[]>([])
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -184,7 +186,7 @@ export default function AdminDashboard() {
                     <motion.tr key={t.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.03 }}
                       className="hover:bg-gray-900/40 transition cursor-pointer"
-                      onClick={() => window.location.href = `/tickets/${t.id}`}>
+                      onClick={() => router.push(`/tickets/${t.id}`)}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           {t.is_escalated && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
