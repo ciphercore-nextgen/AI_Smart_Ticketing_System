@@ -5,12 +5,14 @@ import { PriorityBadge, StatusBadge, DepartmentBadge } from '@/components/ui/Tic
 import { ticketsApi } from '@/lib/api'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-import { Search, Plus, Cpu } from 'lucide-react'
+import { Search, Plus, Cpu, Clock, Timer } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
-import { formatDistanceToNow } from 'date-fns'
+import { useRouter } from 'next/navigation'
+import { formatDistanceToNow, differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns'
 
 export default function TicketsPage() {
   const { user } = useAuthStore()
+  const router = useRouter()
   const [tickets, setTickets]             = useState<any[]>([])
   const [filtered, setFiltered]           = useState<any[]>([])
   const [search, setSearch]               = useState('')
@@ -37,7 +39,7 @@ export default function TicketsPage() {
     setFiltered(result)
   }, [search, statusFilter, priorityFilter, tickets])
 
-  const role = (user as any)?.agent_role_key || user?.role || 'employee'
+  const role = user?.role || 'employee'
   const titleMap: Record<string, string> = {
     employee:              'My Tickets',
     ai_intern:             'HR Queue',
@@ -96,7 +98,7 @@ export default function TicketsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-800/60 bg-gray-900/40">
-                  {['#', 'Title', 'Department', 'Priority', 'Status', 'Agent', 'Submitted'].map(h => (
+                  {['#', 'Title', 'Department', 'Priority', 'Status', 'Agent', 'Time Open', 'Submitted'].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
@@ -109,7 +111,7 @@ export default function TicketsPage() {
                     animate={{ opacity: 1 }}
                     transition={{ delay: i * 0.02 }}
                     className="hover:bg-gray-900/40 transition cursor-pointer"
-                    onClick={() => window.location.href = `/tickets/${t.id}`}
+                    onClick={() => router.push(`/tickets/${t.id}`)}
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -141,6 +143,16 @@ export default function TicketsPage() {
                           <span className="text-xs text-gray-400">{t.assigned_agent.full_name?.split(' ')[0]}</span>
                         </div>
                       ) : <span className="text-xs text-gray-600">Unassigned</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {t.created_at && !['resolved','closed'].includes(t.status) ? (() => {
+                        const mins = differenceInMinutes(new Date(), new Date(t.created_at))
+                        const hrs  = differenceInHours(new Date(), new Date(t.created_at))
+                        const days = differenceInDays(new Date(), new Date(t.created_at))
+                        const display = mins < 60 ? `${mins}m` : hrs < 24 ? `${hrs}h` : `${days}d`
+                        const color = mins > 1440 ? 'text-red-400' : mins > 240 ? 'text-orange-400' : 'text-green-400'
+                        return <span className={`text-xs font-mono font-semibold flex items-center gap-1 ${color}`}><Timer className="w-3 h-3" />{display}</span>
+                      })() : <span className="text-xs text-gray-600">—</span>}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-500">
                       {t.created_at ? formatDistanceToNow(new Date(t.created_at), { addSuffix: true }) : '—'}
