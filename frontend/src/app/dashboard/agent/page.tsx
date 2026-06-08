@@ -9,6 +9,7 @@ import { Ticket, Clock, CheckCircle, AlertTriangle, Cpu, ChevronRight, Sparkles,
 import { PriorityBadge, StatusBadge, DepartmentBadge } from '@/components/ui/TicketBadge'
 import { formatDistanceToNow } from 'date-fns'
 import { useAuthStore } from '@/stores/authStore'
+import { useRouter } from 'next/navigation'
 
 const ROLE_LABELS: Record<string, string> = {
   ai_intern:             'AI Intern',
@@ -26,6 +27,7 @@ const ROLE_SKILLS: Record<string, string> = {
 
 export default function AgentDashboard() {
   const { user } = useAuthStore()
+  const router = useRouter()
   const [tickets, setTickets] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -143,7 +145,7 @@ export default function AgentDashboard() {
                         animate={{ opacity: 1 }}
                         transition={{ delay: i * 0.03 }}
                         className="hover:bg-gray-900/40 transition cursor-pointer"
-                        onClick={() => window.location.href = `/tickets/${t.id}`}
+                        onClick={() => router.push(`/tickets/${t.id}`)}
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
