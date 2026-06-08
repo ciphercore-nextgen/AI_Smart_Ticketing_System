@@ -17,19 +17,23 @@ export default function DashboardLayout({ children, title, subtitle, requiredRol
   const { isAuthenticated, user } = useAuthStore()
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user) {
       router.push('/login')
       return
     }
     if (requiredRoles && user) {
-      const role = (user as any)?.agent_role_key || user?.role
+      const role = user.role
       if (!requiredRoles.includes(role)) {
-        router.push('/unauthorized')
+        // Redirect to the correct dashboard — not login
+        const role = user.role
+        if (['admin','super_admin'].includes(role)) router.push('/dashboard/admin')
+        else if (['ai_intern','it_support_technician','junior_operations'].includes(role)) router.push('/dashboard/agent')
+        else router.push('/dashboard/employee')
       }
     }
-  }, [isAuthenticated, user, requiredRoles, router])
+  }, [isAuthenticated, user])
 
-  if (!isAuthenticated) return null
+  if (!isAuthenticated || !user) return null
 
   return (
     <div className="flex h-screen bg-gray-950">
