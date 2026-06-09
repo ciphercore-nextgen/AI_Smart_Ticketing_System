@@ -13,6 +13,23 @@ from app.models.models import Ticket, TicketStatus, User, TicketComment, AuditLo
 from app.services.tickets.ticket_service import create_ticket, get_tickets_for_user
 from app.services.ai.groq_service import generate_ai_reply
 
+
+def utc_iso(dt) -> "str | None":
+    """
+    Serialize a datetime to ISO 8601 with an explicit UTC "Z" marker.
+
+    SQLite stores DateTime as naive (no tzinfo) even though utcnow() returns
+    a UTC-aware value.  Without the Z suffix, JavaScript's Date() constructor
+    treats the string as *local* time — so in UTC+2 (South Africa) every
+    timestamp appears 2 hours in the past.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt.isoformat() + "Z"
+
+
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
 
@@ -26,12 +43,12 @@ def _ticket_to_dict(t: Ticket) -> dict:
         "status":          t.status.value if hasattr(t.status, "value") else str(t.status),
         "priority":        t.priority.value if hasattr(t.priority, "value") else str(t.priority),
         "is_escalated":    t.is_escalated,
-        "sla_deadline":    t.sla_deadline.isoformat() if t.sla_deadline else None,
+        "sla_deadline":    utc_iso(t.sla_deadline),
         "sla_breached":    t.sla_breached,
         "resolution_note": t.resolution_note,
-        "created_at":      t.created_at.isoformat() if t.created_at else None,
-        "updated_at":      t.updated_at.isoformat() if t.updated_at else None,
-        "resolved_at":     t.resolved_at.isoformat() if t.resolved_at else None,
+        "created_at":      utc_iso(t.created_at),
+        "updated_at":      utc_iso(t.updated_at),
+        "resolved_at":     utc_iso(t.resolved_at),
         "department": {
             "id":    t.department.id,
             "name":  t.department.name,
@@ -162,7 +179,7 @@ async def get_ticket(
             "content":     c.content,
             "is_internal": c.is_internal,
             "is_ai":       c.is_ai,
-            "created_at":  c.created_at.isoformat(),
+            "created_at":  utc_iso(c.created_at),
             "author": {
                 "full_name": c.author.full_name,
                 "role":      c.author.role.value if c.author else "unknown",
@@ -287,7 +304,7 @@ async def add_comment(
         "id":          comment.id,
         "content":     comment.content,
         "is_internal": comment.is_internal,
-        "created_at":  comment.created_at.isoformat(),
+        "created_at":  utc_iso(comment.created_at),
     }
 
 

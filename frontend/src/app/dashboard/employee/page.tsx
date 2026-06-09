@@ -7,10 +7,11 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { Ticket, Clock, CheckCircle, AlertTriangle, Plus, ChevronRight, Sparkles, Cpu } from 'lucide-react'
 import { PriorityBadge, StatusBadge } from '@/components/ui/TicketBadge'
-import { formatDistanceToNow } from 'date-fns'
+import { useLiveTime, formatAgo } from '@/lib/time'
 import { useAuthStore } from '@/stores/authStore'
 
 export default function EmployeeDashboard() {
+  const now = useLiveTime(1000)
   const { user } = useAuthStore()
   const [tickets, setTickets] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -108,7 +109,7 @@ export default function EmployeeDashboard() {
                         </span>
                       )}
                       <span className="text-xs text-gray-600 hidden sm:block">
-                        {t.created_at ? formatDistanceToNow(new Date(t.created_at), { addSuffix: true }) : ''}
+                        {t.created_at ? formatAgo(t.created_at, now) : ''}
                       </span>
                     </div>
                   </Link>

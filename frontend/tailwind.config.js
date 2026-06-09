@@ -4,22 +4,40 @@ module.exports = {
   darkMode: 'class',
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['DM Sans', 'system-ui', 'sans-serif'],
+        mono: ['DM Mono', 'Fira Code', 'monospace'],
+      },
       colors: {
-        brand: {
-          50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd',
-          400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8',
-          800: '#1e40af', 900: '#1e3a8a', 950: '#172554',
+        surface: {
+          DEFAULT: 'var(--bg-card)',
+          subtle:  'var(--bg-subtle)',
+          muted:   'var(--bg-muted)',
+        },
+        border: {
+          DEFAULT: 'var(--border)',
+          subtle:  'var(--border-subtle)',
+        },
+        ink: {
+          DEFAULT: 'var(--text)',
+          2: 'var(--text-2)',
+          3: 'var(--text-3)',
+        },
+        accent: {
+          DEFAULT: 'var(--accent)',
+          hover:   'var(--accent-hover)',
+          subtle:  'var(--accent-subtle)',
+          text:    'var(--accent-text)',
         },
       },
-      fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
-      animation: {
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'slide-in':   'slideIn 0.3s ease-out',
-        'fade-in':    'fadeIn 0.2s ease-out',
+      borderRadius: {
+        DEFAULT: 'var(--radius)',
+        lg: 'var(--radius-lg)',
       },
-      keyframes: {
-        slideIn: { from: { transform: 'translateX(-10px)', opacity: '0' }, to: { transform: 'translateX(0)', opacity: '1' } },
-        fadeIn:  { from: { opacity: '0' }, to: { opacity: '1' } },
+      boxShadow: {
+        sm:  'var(--shadow-sm)',
+        DEFAULT: 'var(--shadow)',
+        md:  'var(--shadow-md)',
       },
     },
   },

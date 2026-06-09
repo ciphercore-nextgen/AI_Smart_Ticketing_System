@@ -1,24 +1,35 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
+import ThemeProvider from '@/components/shared/ThemeProvider'
 
 export const metadata: Metadata = {
   title: 'TicketIQ Enterprise',
-  description: 'AI-Powered Enterprise Smart Ticketing Platform',
+  description: 'AI-Powered Enterprise Support Platform',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className="bg-gray-950 text-gray-100 antialiased">
-        {children}
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            style: { background: '#1f2937', color: '#f9fafb', border: '1px solid #374151' },
-            duration: 4000,
-          }}
-        />
+    <html lang="en" suppressHydrationWarning>
+      <body className="antialiased">
+        <ThemeProvider>
+          {children}
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: 'var(--bg-card)',
+                color: 'var(--text)',
+                border: '1px solid var(--border)',
+                boxShadow: 'var(--shadow-md)',
+                borderRadius: 'var(--radius)',
+                fontSize: '13.5px',
+                fontFamily: 'var(--font-sans)',
+              },
+              duration: 4000,
+            }}
+          />
+        </ThemeProvider>
       </body>
     </html>
   )

@@ -1,10 +1,9 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
 import {
-  Zap, LayoutDashboard, Ticket, BarChart3, Users, Settings,
-  LogOut, Building2, ChevronRight, Cpu, Shield, Plus, HeadphonesIcon
+  LayoutDashboard, Ticket, BarChart3, Users, Settings,
+  LogOut, Building2, Plus, Bell, Shield,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { authApi } from '@/lib/api'
@@ -15,48 +14,54 @@ const navByRole: Record<string, { href: string; icon: any; label: string }[]> = 
   employee: [
     { href: '/dashboard/employee', icon: LayoutDashboard, label: 'Dashboard' },
     { href: '/tickets',            icon: Ticket,          label: 'My Tickets' },
-    { href: '/tickets/new',        icon: Plus,            label: 'Submit Ticket' },
+    { href: '/tickets/new',        icon: Plus,            label: 'New Ticket' },
+    { href: '/alerts',             icon: Bell,            label: 'Alerts' },
   ],
   ai_intern: [
-    { href: '/dashboard/agent', icon: LayoutDashboard,   label: 'Dashboard' },
-    { href: '/tickets',         icon: Ticket,            label: 'HR Queue' },
-    { href: '/analytics/department', icon: BarChart3,    label: 'Analytics' },
+    { href: '/dashboard/agent',      icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/tickets',              icon: Ticket,          label: 'My Queue' },
+    { href: '/analytics/department', icon: BarChart3,       label: 'Analytics' },
+    { href: '/alerts',               icon: Bell,            label: 'Alerts' },
   ],
   it_support_technician: [
-    { href: '/dashboard/agent', icon: LayoutDashboard,   label: 'Dashboard' },
-    { href: '/tickets',         icon: Ticket,            label: 'IT & Finance Queue' },
-    { href: '/analytics/department', icon: BarChart3,    label: 'Analytics' },
+    { href: '/dashboard/agent',      icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/tickets',              icon: Ticket,          label: 'My Queue' },
+    { href: '/analytics/department', icon: BarChart3,       label: 'Analytics' },
+    { href: '/alerts',               icon: Bell,            label: 'Alerts' },
   ],
   junior_operations: [
-    { href: '/dashboard/agent', icon: LayoutDashboard,   label: 'Dashboard' },
-    { href: '/tickets',         icon: Ticket,            label: 'Operations Queue' },
-    { href: '/analytics/department', icon: BarChart3,    label: 'Analytics' },
+    { href: '/dashboard/agent',      icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/tickets',              icon: Ticket,          label: 'My Queue' },
+    { href: '/analytics/department', icon: BarChart3,       label: 'Analytics' },
+    { href: '/alerts',               icon: Bell,            label: 'Alerts' },
   ],
   admin: [
-    { href: '/dashboard/admin',   icon: LayoutDashboard, label: 'Admin Dashboard' },
+    { href: '/dashboard/admin',   icon: LayoutDashboard, label: 'Dashboard' },
     { href: '/tickets',           icon: Ticket,          label: 'All Tickets' },
     { href: '/admin/users',       icon: Users,           label: 'Users' },
     { href: '/admin/departments', icon: Building2,       label: 'Departments' },
     { href: '/analytics/admin',   icon: BarChart3,       label: 'Analytics' },
+    { href: '/alerts',            icon: Bell,            label: 'Alerts' },
     { href: '/admin/settings',    icon: Settings,        label: 'Settings' },
   ],
   super_admin: [
-    { href: '/dashboard/admin',   icon: Shield,          label: 'Admin Dashboard' },
+    { href: '/dashboard/admin',   icon: Shield,          label: 'Dashboard' },
     { href: '/tickets',           icon: Ticket,          label: 'All Tickets' },
     { href: '/admin/users',       icon: Users,           label: 'Users' },
     { href: '/admin/departments', icon: Building2,       label: 'Departments' },
     { href: '/analytics/admin',   icon: BarChart3,       label: 'Analytics' },
+    { href: '/alerts',            icon: Bell,            label: 'Alerts' },
     { href: '/admin/settings',    icon: Settings,        label: 'Settings' },
   ],
 }
 
-const roleDisplayInfo: Record<string, { label: string; color: string; depts?: string }> = {
-  employee:              { label: 'Employee',               color: 'text-cyan-400 bg-cyan-400/10' },
-  ai_intern:             { label: 'AI Intern',              color: 'text-purple-400 bg-purple-400/10', depts: 'HR' },
-  it_support_technician: { label: 'IT Support Technician',  color: 'text-blue-400 bg-blue-400/10',    depts: 'IT · Finance' },
-  junior_operations:     { label: 'Junior Operations',      color: 'text-amber-400 bg-amber-400/10',  depts: 'Operations' },
-  admin:                 { label: 'Administrator',          color: 'text-blue-400 bg-blue-400/10' },
-  super_admin:           { label: 'Super Admin',            color: 'text-red-400 bg-red-400/10' },
+const ROLE_LABELS: Record<string, string> = {
+  employee:              'Employee',
+  ai_intern:             'AI Intern',
+  it_support_technician: 'IT Support',
+  junior_operations:     'Jr Operations',
+  admin:                 'Administrator',
+  super_admin:           'Super Admin',
 }
 
 export default function Sidebar() {
@@ -64,81 +69,73 @@ export default function Sidebar() {
   const router   = useRouter()
   const { user, clearAuth, refresh_token } = useAuthStore()
 
-  const roleKey = (user as any)?.agent_role_key || user?.role || 'employee'
-  const navItems = navByRole[roleKey] || navByRole[user?.role || 'employee'] || navByRole.employee
-  const info = roleDisplayInfo[roleKey] || roleDisplayInfo[user?.role || 'employee'] || { label: roleKey, color: 'text-gray-400 bg-gray-400/10' }
+  const role     = user?.role || 'employee'
+  const navItems = navByRole[role] || navByRole.employee
+  const initials = user?.full_name?.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase() || 'U'
 
   const handleLogout = async () => {
     try { if (refresh_token) await authApi.logout(refresh_token) } catch {}
     clearAuth()
+    if (typeof window !== 'undefined') localStorage.removeItem('ticketiq-auth')
+    toast.success('Signed out')
     router.push('/login')
-    toast.success('Logged out successfully')
   }
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-gray-950 border-r border-gray-800/60 flex flex-col z-40">
+    <aside
+      className="fixed left-0 top-0 h-full flex flex-col z-40"
+      style={{
+        width: 'var(--sidebar-w)',
+        background: 'var(--bg-card)',
+        borderRight: '1px solid var(--border)',
+      }}
+    >
       {/* Logo */}
-      <div className="h-16 flex items-center gap-3 px-5 border-b border-gray-800/60">
-        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
-          <Zap className="w-4 h-4 text-white" />
+      <div className="flex items-center gap-2.5 px-5 py-4" style={{ borderBottom: '1px solid var(--border)', height: 'var(--header-h)' }}>
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: 'var(--accent)' }}>
+          <Ticket className="w-3.5 h-3.5" style={{ color: '#fff' }} />
         </div>
         <div>
-          <span className="font-bold text-white text-sm">TicketIQ</span>
-          <p className="text-xs text-gray-500">Enterprise</p>
+          <p className="text-sm font-bold tracking-tight" style={{ color: 'var(--text)' }}>TicketIQ</p>
+          <p className="text-xs" style={{ color: 'var(--text-3)', marginTop: -1 }}>Enterprise</p>
         </div>
-      </div>
-
-      {/* Role badge */}
-      <div className="px-4 py-3 border-b border-gray-800/60 space-y-1">
-        <div className={clsx('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium', info.color)}>
-          <Cpu className="w-3 h-3" />
-          {info.label}
-        </div>
-        {info.depts && (
-          <p className="text-xs text-gray-600 pl-1">Handles: <span className="text-gray-500">{info.depts}</span></p>
-        )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {navItems.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + '/')
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
+        <p className="section-label px-2 mb-2">Menu</p>
+        {navItems.map(item => {
+          const active = pathname === item.href || (item.href !== '/dashboard/employee' && item.href !== '/dashboard/agent' && item.href !== '/dashboard/admin' && pathname.startsWith(item.href + '/'))
           return (
-            <Link key={item.href} href={item.href}>
-              <motion.div
-                whileHover={{ x: 2 }}
-                className={clsx(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all',
-                  active
-                    ? 'bg-blue-600/15 text-blue-400 border border-blue-500/20'
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
-                )}
-              >
-                <item.icon className="w-4 h-4 flex-shrink-0" />
-                <span className="flex-1">{item.label}</span>
-                {active && <ChevronRight className="w-3 h-3" />}
-              </motion.div>
+            <Link key={item.href} href={item.href}
+              className={clsx('nav-item', active && 'active')}>
+              <item.icon className="w-4 h-4 flex-shrink-0" />
+              <span>{item.label}</span>
             </Link>
           )
         })}
       </nav>
 
-      {/* User */}
-      <div className="border-t border-gray-800/60 p-4">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-            {user?.full_name?.charAt(0).toUpperCase() || 'U'}
+      {/* User footer */}
+      <div className="px-3 py-3" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="flex items-center gap-2.5 px-2 py-2 rounded-lg mb-1">
+          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+            style={{ background: 'var(--accent-subtle)', color: 'var(--accent-text)' }}>
+            {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">{user?.full_name}</p>
-            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+            <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{user?.full_name}</p>
+            <p className="text-xs truncate" style={{ color: 'var(--text-3)' }}>{ROLE_LABELS[role]}</p>
           </div>
         </div>
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all"
+        <button onClick={handleLogout}
+          className="nav-item w-full"
+          style={{ color: 'var(--text-3)' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--danger)'; (e.currentTarget as HTMLElement).style.background = 'var(--danger-bg)' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-3)'; (e.currentTarget as HTMLElement).style.background = '' }}
         >
-          <LogOut className="w-4 h-4" />
+          <LogOut className="w-4 h-4 flex-shrink-0" />
           Sign out
         </button>
       </div>

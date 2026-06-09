@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { PriorityBadge, StatusBadge, DepartmentBadge } from '@/components/ui/TicketBadge'
-import { formatDistanceToNow } from 'date-fns'
+import { useLiveTime, formatAgo } from '@/lib/time'
 
 const DEPT_COLORS: Record<string, string> = {
   'Human Resources':       '#8B5CF6',
@@ -22,6 +22,7 @@ const DEPT_COLORS: Record<string, string> = {
 }
 
 export default function AdminDashboard() {
+  const now = useLiveTime(1000)
   const [overview, setOverview] = useState<any>({})
   const [deptData, setDeptData] = useState<any[]>([])
   const [priorityData, setPriorityData] = useState<any[]>([])
@@ -216,7 +217,7 @@ export default function AdminDashboard() {
                         ) : <span className="text-xs text-gray-600">Unassigned</span>}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500">
-                        {t.created_at ? formatDistanceToNow(new Date(t.created_at), { addSuffix: true }) : '—'}
+                        {t.created_at ? formatAgo(t.created_at, now) : '—'}
                       </td>
                     </motion.tr>
                   ))}

@@ -7,7 +7,7 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { Ticket, Clock, CheckCircle, AlertTriangle, Cpu, ChevronRight, Sparkles, Zap } from 'lucide-react'
 import { PriorityBadge, StatusBadge, DepartmentBadge } from '@/components/ui/TicketBadge'
-import { formatDistanceToNow } from 'date-fns'
+import { useLiveTime, formatAgo } from '@/lib/time'
 import { useAuthStore } from '@/stores/authStore'
 import { useRouter } from 'next/navigation'
 
@@ -26,6 +26,7 @@ const ROLE_SKILLS: Record<string, string> = {
 }
 
 export default function AgentDashboard() {
+  const now = useLiveTime(1000)
   const { user } = useAuthStore()
   const router = useRouter()
   const [tickets, setTickets] = useState<any[]>([])
@@ -180,7 +181,7 @@ export default function AgentDashboard() {
                           }
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500">
-                          {t.created_at ? formatDistanceToNow(new Date(t.created_at), { addSuffix: true }) : '—'}
+                          {t.created_at ? formatAgo(t.created_at, now) : '—'}
                         </td>
                       </motion.tr>
                     )

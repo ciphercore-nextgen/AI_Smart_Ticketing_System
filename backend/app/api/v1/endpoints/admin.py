@@ -11,6 +11,18 @@ from app.core.deps import get_current_user, require_roles
 from app.models.models import User, Department, UserRole
 from app.services.auth.auth_service import hash_password
 
+
+from datetime import timezone
+
+def utc_iso(dt) -> "str | None":
+    """Return ISO 8601 with Z suffix so JS parses it as UTC, not local time."""
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt.isoformat() + "Z"
+
+
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 AdminOnly = require_roles("admin", "super_admin")
@@ -29,7 +41,7 @@ def _user_dict(u: User) -> dict:
         "agent_role_key":    u.agent_role_key,
         "job_title":         u.job_title,
         "is_active":         u.is_active,
-        "created_at":        u.created_at.isoformat() if u.created_at else None,
+        "created_at":        utc_iso(u.created_at),
     }
 
 

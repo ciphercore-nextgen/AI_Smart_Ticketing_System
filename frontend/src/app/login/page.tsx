@@ -1,23 +1,22 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
-import { Zap, Mail, Lock, Eye, EyeOff, AlertCircle, Cpu, Users, Wrench } from 'lucide-react'
+import { Ticket, Mail, Lock, Eye, EyeOff, AlertCircle, Users, Wrench, Shield } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { authApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/authStore'
 
 const EMPLOYEES = [
-  { label: 'HR Employee',      email: 'employee@ticketiq.com', pw: 'Employee@1234', dept: 'Human Resources',        color: 'border-purple-500/30', badge: 'text-purple-400' },
-  { label: 'IT Employee',      email: 'sarah.k@ticketiq.com',  pw: 'Employee@1234', dept: 'Information Technology', color: 'border-blue-500/30',   badge: 'text-blue-400' },
-  { label: 'Finance Employee', email: 'tom.w@ticketiq.com',    pw: 'Employee@1234', dept: 'Finance',                color: 'border-green-500/30',  badge: 'text-green-400' },
-  { label: 'Ops Employee',     email: 'nina.p@ticketiq.com',   pw: 'Employee@1234', dept: 'Operations',             color: 'border-amber-500/30',  badge: 'text-amber-400' },
+  { label: 'HR Employee',      email: 'employee@ticketiq.com', pw: 'Employee@1234', dept: 'Human Resources'        },
+  { label: 'IT Employee',      email: 'sarah.k@ticketiq.com',  pw: 'Employee@1234', dept: 'Information Technology' },
+  { label: 'Finance Employee', email: 'tom.w@ticketiq.com',    pw: 'Employee@1234', dept: 'Finance'                },
+  { label: 'Ops Employee',     email: 'nina.p@ticketiq.com',   pw: 'Employee@1234', dept: 'Operations'             },
 ]
 
 const AGENTS = [
-  { label: 'AI Intern',     email: 'ai.intern@ticketiq.com', pw: 'Agent@1234', handles: 'HR tickets',              color: 'border-purple-500/30', badge: 'text-purple-400' },
-  { label: 'IT Support',    email: 'it.agent@ticketiq.com',  pw: 'Agent@1234', handles: 'IT + Finance tickets',    color: 'border-blue-500/30',   badge: 'text-blue-400' },
-  { label: 'Jr Operations', email: 'ops.agent@ticketiq.com', pw: 'Agent@1234', handles: 'Operations tickets',      color: 'border-amber-500/30',  badge: 'text-amber-400' },
+  { label: 'AI Intern',     email: 'ai.intern@ticketiq.com', pw: 'Agent@1234', handles: 'HR tickets'           },
+  { label: 'IT Support',    email: 'it.agent@ticketiq.com',  pw: 'Agent@1234', handles: 'IT · Finance tickets' },
+  { label: 'Jr Operations', email: 'ops.agent@ticketiq.com', pw: 'Agent@1234', handles: 'Operations tickets'   },
 ]
 
 export default function LoginPage() {
@@ -29,145 +28,185 @@ export default function LoginPage() {
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!email || !password) return
+  const doLogin = async (em: string, pw: string) => {
     setError('')
     setLoading(true)
     try {
-      const { data } = await authApi.login(email, password)
+      const { data } = await authApi.login(em, pw)
       setAuth(data.user, data.access_token, data.refresh_token)
-      toast.success(`Welcome back, ${data.user.full_name}!`)
+      toast.success(`Welcome, ${data.user.full_name}!`)
       router.push(data.redirect_url)
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Invalid credentials. Please try again.')
+      const msg = err.response?.data?.detail || err.message || ''
+      if (!err.response) {
+        setError('Cannot reach the server. Make sure the backend is running on port 8000.')
+      } else if (err.response.status === 401) {
+        setError('Wrong credentials. Run: python ../scripts/seed_data.py to seed the database.')
+      } else {
+        setError(msg || 'Login failed')
+      }
     } finally {
       setLoading(false)
     }
   }
 
-  const quickFill = (em: string, pw: string) => { setEmail(em); setPassword(pw); setError('') }
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email || !password) return
+    await doLogin(email, password)
+  }
+
+  const quickLogin = (em: string, pw: string) => {
+    setEmail(em)
+    setPassword(pw)
+    doLogin(em, pw)
+  }
 
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.03)_1px,transparent_1px)] bg-[size:64px_64px]" />
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/5 rounded-full blur-3xl" />
+    <div
+      className="min-h-screen flex items-center justify-center p-6"
+      style={{ background: 'var(--bg)' }}
+    >
+      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-6"
-      >
-        {/* Login form */}
-        <div className="glass-card rounded-2xl p-8 border border-gray-800/60 flex flex-col justify-center">
+        {/* ── Left: Login form ──────────────────────────── */}
+        <div className="card rounded-2xl p-8 flex flex-col justify-center">
+
+          {/* Brand */}
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center">
-              <Zap className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'var(--accent)' }}>
+              <Ticket className="w-4.5 h-4.5 text-white" style={{ width: 18, height: 18 }} />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white tracking-tight">TicketIQ</h1>
-              <p className="text-xs text-gray-500">Enterprise Support Platform</p>
+              <p className="font-bold text-base tracking-tight" style={{ color: 'var(--text)' }}>TicketIQ</p>
+              <p className="text-xs" style={{ color: 'var(--text-3)' }}>Enterprise Support Platform</p>
             </div>
           </div>
 
-          <h2 className="text-2xl font-bold text-white mb-1">Sign in</h2>
-          <p className="text-gray-500 text-sm mb-6">Access your support dashboard</p>
+          <h2 className="text-2xl font-bold mb-1" style={{ color: 'var(--text)' }}>Sign in</h2>
+          <p className="text-sm mb-6" style={{ color: 'var(--text-3)' }}>Access your support dashboard</p>
 
+          {/* Error banner */}
           {error && (
-            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5 mb-4">
-              <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-              <p className="text-red-400 text-sm">{error}</p>
+            <div className="flex items-start gap-2 rounded-lg px-3 py-2.5 mb-4 text-sm"
+              style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)' }}>
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
+            {/* Email */}
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1.5">Email</label>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>Email</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-3)' }} />
+                <input
+                  type="email" value={email} onChange={e => setEmail(e.target.value)}
                   placeholder="you@company.com" required
-                  className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-9 pr-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition" />
+                  className="input" style={{ paddingLeft: 36 }}
+                />
               </div>
             </div>
+
+            {/* Password */}
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1.5">Password</label>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                <input type={showPass ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-3)' }} />
+                <input
+                  type={showPass ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••" required
-                  className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-9 pr-10 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition" />
+                  className="input" style={{ paddingLeft: 36, paddingRight: 36 }}
+                />
                 <button type="button" onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  style={{ color: 'var(--text-3)' }}>
                   {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
-            <button type="submit" disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg py-2.5 text-sm transition flex items-center justify-center gap-2">
+
+            <button type="submit" disabled={loading} className="btn btn-primary w-full justify-center">
               {loading
-                ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Signing in...</>
-                : 'Sign in →'}
+                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Signing in…</>
+                : 'Sign in'}
             </button>
           </form>
 
-          <div className="mt-5 pt-4 border-t border-gray-800/60">
-            <p className="text-xs text-gray-600 mb-1">Admin access</p>
-            <button onClick={() => quickFill('admin@ticketiq.com', 'Admin@1234')}
-              className="text-xs text-blue-400 hover:text-blue-300 font-mono transition">
+          {/* Admin quick-access */}
+          <div className="mt-5 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+            <p className="text-xs mb-1.5" style={{ color: 'var(--text-3)' }}>Quick admin access</p>
+            <button onClick={() => quickLogin('admin@ticketiq.com', 'Admin@1234')}
+              className="flex items-center gap-2 text-xs font-medium transition"
+              style={{ color: 'var(--accent)' }}>
+              <Shield className="w-3 h-3" />
               admin@ticketiq.com · Admin@1234
             </button>
           </div>
         </div>
 
-        {/* Demo accounts */}
+        {/* ── Right: Demo accounts ──────────────────────── */}
         <div className="space-y-4">
+
           {/* Employees */}
-          <div className="glass-card rounded-2xl p-5 border border-gray-800/60">
-            <div className="flex items-center gap-2 mb-3">
-              <Users className="w-4 h-4 text-gray-400" />
-              <p className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Department Employees</p>
+          <div className="card rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Users className="w-4 h-4" style={{ color: 'var(--text-3)' }} />
+              <p className="section-label">Department Employees</p>
             </div>
-            <p className="text-xs text-gray-500 mb-3">Each employee only sees and submits their own tickets. AI automatically routes to the right agent.</p>
+            <p className="text-xs mb-3" style={{ color: 'var(--text-3)' }}>
+              Each employee sees and submits only their own tickets. AI routes automatically to the right agent.
+            </p>
             <div className="grid grid-cols-2 gap-2">
               {EMPLOYEES.map(acc => (
-                <button key={acc.email} onClick={() => quickFill(acc.email, acc.pw)}
-                  className={`text-left p-3 rounded-lg border ${acc.color} bg-gray-900/50 hover:bg-gray-800/60 transition group`}>
-                  <p className="text-xs font-semibold text-white group-hover:text-blue-300 transition leading-tight">{acc.label}</p>
-                  <p className={`text-xs mt-0.5 ${acc.badge}`}>{acc.dept}</p>
-                  <p className="text-xs text-gray-600 mt-1 truncate font-mono">{acc.email}</p>
+                <button key={acc.email} onClick={() => quickLogin(acc.email, acc.pw)}
+                  className="text-left p-3 rounded-lg transition"
+                  style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-muted)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-subtle)'}
+                >
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{acc.label}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--accent-text)' }}>{acc.dept}</p>
+                  <p className="text-xs mt-1 mono truncate" style={{ color: 'var(--text-3)', fontSize: 11 }}>{acc.email}</p>
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-600 mt-2">Password: <span className="text-gray-400 font-mono">Employee@1234</span></p>
+            <p className="text-xs mt-2" style={{ color: 'var(--text-3)' }}>
+              Password: <span className="mono" style={{ color: 'var(--text-2)' }}>Employee@1234</span>
+            </p>
           </div>
 
           {/* Agents */}
-          <div className="glass-card rounded-2xl p-5 border border-gray-800/60">
-            <div className="flex items-center gap-2 mb-3">
-              <Cpu className="w-4 h-4 text-gray-400" />
-              <p className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Support Agents</p>
+          <div className="card rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Wrench className="w-4 h-4" style={{ color: 'var(--text-3)' }} />
+              <p className="section-label">Support Agents</p>
             </div>
-            <p className="text-xs text-gray-500 mb-3">AI reads each ticket and decides which agent role is best equipped to solve it.</p>
+            <p className="text-xs mb-3" style={{ color: 'var(--text-3)' }}>
+              AI reads each ticket and assigns it to the agent role best equipped to solve it.
+            </p>
             <div className="grid grid-cols-3 gap-2">
               {AGENTS.map(acc => (
-                <button key={acc.email} onClick={() => quickFill(acc.email, acc.pw)}
-                  className={`text-left p-3 rounded-lg border ${acc.color} bg-gray-900/50 hover:bg-gray-800/60 transition group`}>
-                  <div className="flex items-center gap-1 mb-1">
-                    <Wrench className="w-3 h-3 text-gray-500 flex-shrink-0" />
-                    <p className="text-xs font-semibold text-white group-hover:text-blue-300 transition truncate">{acc.label}</p>
-                  </div>
-                  <p className={`text-xs ${acc.badge} leading-tight`}>{acc.handles}</p>
+                <button key={acc.email} onClick={() => quickLogin(acc.email, acc.pw)}
+                  className="text-left p-3 rounded-lg transition"
+                  style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-muted)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-subtle)'}
+                >
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{acc.label}</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-3)', lineHeight: '1.3' }}>{acc.handles}</p>
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-600 mt-2">Password: <span className="text-gray-400 font-mono">Agent@1234</span></p>
+            <p className="text-xs mt-2" style={{ color: 'var(--text-3)' }}>
+              Password: <span className="mono" style={{ color: 'var(--text-2)' }}>Agent@1234</span>
+            </p>
           </div>
-        </div>
 
-      </motion.div>
+        </div>
+      </div>
     </div>
   )
 }
