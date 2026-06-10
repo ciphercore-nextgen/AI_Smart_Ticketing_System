@@ -109,3 +109,9 @@ export const analyticsApi = {
   byPriority:    () => api.get('/analytics/by-priority'),
   byStatus:      () => api.get('/analytics/by-status'),
 }
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+export const notificationsApi = {
+  list: (since?: string) =>
+    api.get('/notifications' + (since ? `?since=${encodeURIComponent(since)}` : '')),
+}

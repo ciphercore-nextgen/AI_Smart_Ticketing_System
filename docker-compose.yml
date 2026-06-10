@@ -4,29 +4,40 @@ services:
     build:
       context: ./backend
     container_name: ticketiq-backend
+    restart: unless-stopped
     ports:
       - "8000:8000"
-
     env_file:
       - ./backend/.env
-
+    environment:
+      # Override DB path to write inside the named volume
+      DATABASE_URL: sqlite+aiosqlite:////app/data/ticketiq.db
+      # Allow requests from the browser (host machine) AND the frontend container
+      CORS_ORIGINS: "http://localhost:3000,http://frontend:3000,http://ticketiq-frontend:3000"
     volumes:
       - sqlite_data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   frontend:
     build:
       context: ./frontend
-
+      args:
+        # Passed at build time so Next.js can bake NEXT_PUBLIC_* into the bundle.
+        # At runtime the browser calls the backend on the HOST (port 8000),
+        # not through Docker's internal network — so localhost:8000 is correct here.
+        NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
     container_name: ticketiq-frontend
-
+    restart: unless-stopped
     ports:
       - "3000:3000"
-
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
-
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   sqlite_data:
