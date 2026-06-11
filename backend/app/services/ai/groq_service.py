@@ -1,22 +1,19 @@
 """
-TicketIQ — AI Tokenization & Universal Agent Routing
-=====================================================
-All agents are available for ALL departments.
-The AI tokenizes the ticket content and scores it against each agent's
-skill profile. The agent with the highest token overlap — weighted by
-problem severity and expertise depth — gets the ticket.
+TicketIQ — AI Classification & Agent Routing
+=============================================
+Routing is governed by the Enterprise Simulation Rules document.
+
+THREE AGENTS, STRICT SCOPES:
+  it_support_technician  — passwords, devices, access, connectivity, hardware/software
+  ai_intern              — reports, data analysis, dashboards, research, documentation
+  junior_operations      — workflow failures, automation, scheduled jobs, integrations
+
+FOUR DEPARTMENTS (submit only — never resolve):
+  HR, IT, Finance, Operations
 
 TWO-STAGE PROCESS:
-  Stage 1 — Ticket Classification
-    GROQ reads the ticket and returns:
-      - department, priority, category, sentiment, summary
-      - a ranked list of skill_tokens extracted from the ticket content
-
-  Stage 2 — Agent Selection (tokenized scoring)
-    The extracted tokens are scored against every active agent's skill_tokens.
-    The agent with the highest weighted score is assigned.
-    GROQ is used to validate/confirm the selection when available.
-    A pure Python fallback handles GROQ outages with zero service disruption.
+  Stage 1 — classify the ticket (department, priority, category, tokens)
+  Stage 2 — select the agent whose scope matches the ticket's required expertise
 """
 
 import json
@@ -36,77 +33,96 @@ def get_groq_client() -> AsyncGroq:
     return client
 
 
-# ─── Stage 1: Ticket Classification Prompt ────────────────────────────────────
-# The AI extracts meaning and skill tokens from the ticket.
-# It does NOT know which agent will be selected — that's Stage 2.
+# ─── Stage 1: Classification Prompt ──────────────────────────────────────────
 
-CLASSIFICATION_PROMPT = """You are TicketIQ's ticket analysis engine.
+CLASSIFICATION_PROMPT = """You are TicketIQ's ticket analysis engine for an enterprise service desk.
 
-Read the support ticket and extract structured information including skill tokens
-that describe what expertise is needed to resolve it.
+Your job is to classify the ticket and extract skill tokens that describe the
+EXPERTISE needed to resolve it — not which department submitted it.
 
-DEPARTMENTS: hr | it | finance | operations
+SUBMITTING DEPARTMENTS: hr | it | finance | operations
+(These departments only SUBMIT tickets. They do not resolve them.)
 
-SKILL TOKEN VOCABULARY (extract the most relevant ones):
-HR tokens: leave, annual_leave, sick_leave, maternity, paternity, vacation,
-  payslip, salary, pay, compensation, bonus, onboarding, offboarding, new_hire,
-  resignation, termination, hr_policy, policy, contract, employment, benefits,
-  pension, performance_review, appraisal, training, learning, development,
-  workplace_conduct, harassment, conflict, disciplinary, job_change, promotion,
-  transfer, probation, health_insurance, medical_aid, wellbeing
+RESOLVING AGENTS and their scopes:
 
-IT tokens: password, vpn, network, wifi, internet, connectivity, laptop, computer,
-  pc, desktop, hardware, device, software, installation, install, update, upgrade,
-  crash, bug, error, system, server, infrastructure, cloud, email, outlook, teams,
-  slack, access, permission, account, login, authentication, 2fa, mfa, security,
-  printer, scanner, monitor, keyboard, mouse, phone, mobile, backup, data_recovery,
-  cybersecurity, breach, database, api, integration, deployment
+1. it_support_technician
+   Handles: password resets, account lockouts, email access, printer problems,
+   VPN issues, software installation, laptop/desktop troubleshooting, Wi-Fi,
+   user permissions, Microsoft 365, hardware, new employee device setup.
+   Skill tokens: password, password_reset, account_lockout, login, authentication,
+   2fa, mfa, account, access, permission, email, outlook, microsoft_365, teams,
+   vpn, network, wifi, internet, connectivity, laptop, computer, hardware, device,
+   printer, software, installation, install, update, crash, bug, error, system,
+   shared_drive, new_employee_setup, device_onboarding, cybersecurity, backup
 
-Finance tokens: expense, expense_claim, reimbursement, invoice, receipt, payroll,
-  salary_discrepancy, budget, purchase_order, vendor_payment, financial_report,
-  accounting_software, tax, vat, audit, financial_system, erp, sap,
-  approval_workflow, cost_centre, procurement_system
+2. ai_intern
+   Handles: data analysis, report generation, dashboard assistance, research,
+   knowledge base creation, document summarization, trend analysis, FAQ generation,
+   business intelligence, data cleaning, AI-powered insights.
+   Also handles requests where an employee needs AI ASSISTANCE for analysis,
+   research, or reporting — e.g. "help me use AI to analyse our data",
+   "I need an AI-generated summary", "can AI help me research this topic".
+   Skill tokens: report, reporting, data_analysis, analysis, analytics, dashboard,
+   trend_analysis, trends, insights, business_intelligence, data_cleaning,
+   document_summary, summarize, faq, knowledge_base, research, documentation,
+   employee_turnover, monthly_report, quarterly_report, survey_analysis,
+   support_trends, ticket_analytics, performance_report, financial_report,
+   operational_report, hr_report, ai_insights, ai_assistance, ai_powered_analysis,
+   ai_powered_report, ai_recommendation, ai_summary, content_generation,
+   text_analysis, sentiment_analysis, data_extraction, intelligent_search
 
-Operations tokens: office, facilities, maintenance, repair, building, desk, chair,
-  furniture, ergonomics, meeting_room, conference_room, booking, cleaning,
-  housekeeping, sanitization, parking, access_card, security_badge, key_fob,
-  air_conditioning, heating, lighting, plumbing, elevator, supplies, stationery,
-  office_supplies, consumables, delivery, courier, shipment, inventory, travel,
-  flight, hotel, accommodation, car_hire, event, event_logistics, catering, venue,
-  vendor, supplier, procurement, purchase_request, company_vehicle, fleet,
-  asset_management, health_safety, fire_safety, first_aid, incident
+3. junior_operations
+   Handles: workflow failures, process automation issues, scheduled job failures,
+   integration problems, approval workflow failures, notification failures,
+   onboarding/offboarding workflow failures, low-code/no-code platform issues.
+   Skill tokens: workflow, workflow_failure, automation, automation_failure,
+   process_automation, scheduled_job, scheduled_task, job_failure, integration,
+   integration_failure, notification_failure, approval_workflow, leave_workflow,
+   finance_workflow, ticket_workflow, escalation_automation, low_code, no_code,
+   power_automate, erp_workflow, provisioning_failure, onboarding_workflow
 
-PRIORITY DETECTION — read the content carefully, don't default to medium:
+CRITICAL DISAMBIGUATION RULES — apply before assigning tokens:
 
-CRITICAL (assign immediately — 4hr SLA):
-  Keywords/signals: "not working at all", "completely blocked", "server down", "system down",
-  "data loss", "data breach", "security incident", "hacked", "ransomware", "virus",
-  "payroll not processed", "salaries not paid", "production down", "outage",
-  "medical emergency", "safety hazard", "fire", "flooding", "injury",
-  "urgent urgent", "emergency", "ASAP", "immediately", "right now",
-  "cannot work at all", "whole team affected", "entire company", "everyone impacted"
+AI-RELATED TICKETS — read carefully:
+- "Help me use AI to analyse data / generate a report / summarise a document / research a topic"
+  → ai_intern (they provide AI-powered data and reporting assistance)
+- "I need AI insights / AI-powered dashboard / AI recommendations on our data"
+  → ai_intern
+- "The AI chatbot/tool is not loading, not responding, crashing, won't open, can't access it"
+  → it_support_technician (broken software — user can't even get in, IT must fix the access)
+- "Copilot not working", "ChatGPT access blocked", "AI assistant giving errors"
+  → it_support_technician (IT access/software issue, not a data task)
+- "The AI automation / AI workflow is failing / not triggering"
+  → junior_operations (broken automated process)
 
-HIGH (respond within 24hrs):
-  Keywords/signals: "blocking my work", "cannot complete", "deadline today", "due tomorrow",
-  "client presentation", "meeting in an hour", "manager waiting", "customer affected",
-  "expense not reimbursed for weeks", "payslip wrong", "overpaid", "underpaid",
-  "VPN down" (if working remotely), "email not working", "can't access system",
-  "multiple people affected", "team blocked", "frustrated", "escalating"
+KEY TEST: Is the user asking someone to DO AI work for them (analysis, reports)?
+→ ai_intern. Is the user saying an AI tool/app is technically broken and they can't use it?
+→ it_support_technician.
 
-MEDIUM (respond within 3 days):
-  Standard requests with normal business impact. Single person affected.
-  Can work around the issue temporarily. No immediate deadline pressure.
+WORKFLOW/AUTOMATION TICKETS:
+- "automation" routes to junior_operations ONLY when a named BUSINESS WORKFLOW or
+  SCHEDULED JOB is broken (e.g. "leave approval flow stopped", "cron job failed").
+- Generic "something isn't working" or "it's not responding" without naming a workflow
+  → it_support_technician.
 
-LOW (respond within a week):
-  Non-urgent. Nice-to-have. Easy workaround exists. Future planning.
-  Examples: leave requests for distant dates, general policy questions, minor improvements
+BROKEN APP/SOFTWARE TICKETS:
+- "not responding", "not loading", "crashed", "can't open", "keeps freezing"
+  → it_support_technician UNLESS a specific named workflow or scheduled job is mentioned.
+
+PRIORITY RULES:
+CRITICAL (4hr SLA): system/server down, data breach, security incident, payroll not processed,
+  entire team blocked, production outage, safety hazard, emergency
+HIGH (24hr SLA): blocking one person's work, deadline today, client presentation,
+  email/VPN down for remote worker, wrong payslip, multiple people affected
+MEDIUM (3 days): standard single-person request, can work around it temporarily
+LOW (1 week): non-urgent, nice-to-have, future planning, distant leave request
 
 Respond ONLY with valid JSON — no markdown, no explanation:
 {
   "department_slug": "<hr|it|finance|operations>",
-  "department_name": "<full department name>",
+  "department_name": "<full name>",
   "priority": "<critical|high|medium|low>",
-  "category": "<specific sub-category, e.g. 'VPN Access', 'Leave Request', 'Expense Claim'>",
+  "category": "<specific sub-category, e.g. 'Password Reset', 'Report Generation', 'Workflow Failure'>",
   "sentiment": "<positive|neutral|frustrated|urgent>",
   "summary": "<one sentence: what does the employee need?>",
   "priority_reason": "<one sentence: why this priority?>",
@@ -114,39 +130,58 @@ Respond ONLY with valid JSON — no markdown, no explanation:
   "token_weights": {"<token>": <1-3>, ...}
 }
 
-token_weights: rate each token 1 (loosely relevant) to 3 (core skill required).
-Extract 3–12 tokens. Be precise — only tokens that truly describe the expertise needed."""
+token_weights: 1 = loosely relevant, 2 = relevant, 3 = core skill required.
+Extract 3–10 tokens. Only tokens that describe the EXPERTISE needed, not the department."""
 
 
 # ─── Stage 2: Agent Selection Prompt ─────────────────────────────────────────
-# Given ticket tokens and agent profiles, AI confirms the best agent.
 
 AGENT_SELECTION_PROMPT = """You are TicketIQ's agent assignment engine.
 
-A ticket has been tokenized. You have the extracted skill tokens and a list of
-available agents with their skill profiles. Select the single best agent.
+STRICT ENTERPRISE RULES — agents have fixed scopes:
 
-SELECTION RULES:
-1. Match ticket skill_tokens against each agent's skill_tokens
-2. Weight by token_weights — higher weight tokens matter more
-3. Consider agent current_load — prefer agents with fewer active tickets
-4. Pick the agent whose skills BEST match the PRIMARY problem in the ticket
-5. Any agent can handle any ticket — pick by skill fit, not by department rule
+IT Support Assistant: ONLY handles IT problems — passwords, devices, access,
+  hardware, software, email, VPN, printers, network. NOT data analysis, NOT HR.
+
+AI Intern: ONLY handles data/reporting/analysis work — reports, dashboards,
+  research, documentation, summaries, FAQs, trend analysis. NOT IT support, NOT HR policy.
+
+Junior Automation Support: ONLY handles workflow and automation failures —
+  broken workflows, failed scheduled jobs, integration errors, automation bugs.
+  NOT passwords, NOT data analysis, NOT hardware, NOT broken apps or software.
+
+ROUTING EXAMPLES — use these to calibrate:
+- "Password reset / can't login / VPN down / laptop broken" → IT Support Assistant
+- "Generate a report / analyse data / summarise document / create dashboard" → AI Intern
+- "I need help using AI to research our sales trends" → AI Intern (AI-powered analysis task)
+- "Copilot is not loading / AI chatbot app is broken / can't access the AI tool" → IT Support Assistant (broken app access)
+- "The leave approval workflow stopped / scheduled job failed / automation not triggering" → Junior Automation Support
+- "HR submitted a ticket about a password reset" → IT Support Assistant (content, not dept)
+- "Finance submitted a ticket about a trend report" → AI Intern (content, not dept)
+- "IT submitted a ticket about a workflow failure" → Junior Automation Support (content, not dept)
+
+DISAMBIGUATION FOR AI-RELATED TICKETS:
+Ask: is the user asking someone to DO AI work for them (analysis, reports, summaries)?
+→ ai_intern.
+Or is the user saying an AI tool/app is technically broken and they can't use it at all?
+→ it_support_technician.
+
+STRICT RULE: "not responding / not working / crashed / not loading" without a named
+workflow or scheduled job → IT Support Assistant, NOT Junior Automation Support.
+
+Match ticket skill_tokens to agent scope strictly. Prefer the agent whose
+PRIMARY expertise covers the core problem, not the submitting department.
 
 Respond ONLY with valid JSON:
 {
   "selected_agent_id": "<agent_id>",
   "selection_confidence": <0.0-1.0>,
-  "routing_rationale": "<one sentence: why this specific agent for this ticket>",
+  "routing_rationale": "<one sentence: why this agent for this specific problem>",
   "token_match_score": <0-100>
 }"""
 
 
 async def classify_ticket(title: str, description: str) -> dict:
-    """
-    Stage 1: Extract skill tokens and classification from ticket content.
-    Returns classification dict including skill_tokens and token_weights.
-    """
     if not settings.GROQ_API_KEY or settings.GROQ_API_KEY.startswith("gsk_your"):
         return _fallback_classify(title, description)
 
@@ -165,7 +200,6 @@ async def classify_ticket(title: str, description: str) -> dict:
 
         result = json.loads(response.choices[0].message.content)
 
-        # Validate and sanitise
         valid_slugs = {"hr", "it", "finance", "operations"}
         if result.get("department_slug") not in valid_slugs:
             result["department_slug"] = _keyword_dept(title + " " + description)
@@ -194,17 +228,11 @@ async def classify_ticket(title: str, description: str) -> dict:
 async def select_agent_for_ticket(
     ticket_tokens: list[str],
     token_weights: dict[str, int],
-    agents: list[dict],  # [{"id": "...", "full_name": "...", "agent_role_key": "...", "current_load": N}]
+    agents: list[dict],
 ) -> dict:
-    """
-    Stage 2: Given tokenized ticket and all available agents,
-    return the best agent ID using AI tokenization scoring.
-    Falls back to pure Python token scoring if GROQ is unavailable.
-    """
     if not agents:
         return {"selected_agent_id": None, "routing_rationale": "No agents available", "selection_confidence": 0}
 
-    # Always compute Python token scores (used as fallback and as sanity check)
     python_scores = _score_agents_by_tokens(ticket_tokens, token_weights, agents)
     best_by_tokens = max(python_scores, key=lambda x: x["score"])
 
@@ -218,19 +246,18 @@ async def select_agent_for_ticket(
         }
 
     try:
-        # Build agent context for GROQ
         agent_context = []
         for a in agents:
             profile = AGENT_SKILL_PROFILES.get(a.get("agent_role_key", ""), {})
             score_info = next((s for s in python_scores if s["agent_id"] == a["id"]), {})
             agent_context.append({
-                "id":               a["id"],
-                "name":             a["full_name"],
-                "role":             a.get("agent_role_key", "unknown"),
-                "expertise":        profile.get("expertise_summary", "General support"),
-                "skill_tokens":     profile.get("skill_tokens", []),
-                "current_load":     a.get("current_load", 0),
-                "token_score":      score_info.get("score", 0),
+                "id":           a["id"],
+                "name":         a["full_name"],
+                "role":         a.get("agent_role_key", "unknown"),
+                "expertise":    profile.get("expertise_summary", "General support"),
+                "skill_tokens": profile.get("skill_tokens", []),
+                "current_load": a.get("current_load", 0),
+                "token_score":  score_info.get("score", 0),
             })
 
         groq = get_groq_client()
@@ -255,7 +282,6 @@ async def select_agent_for_ticket(
         result = json.loads(response.choices[0].message.content)
         selected_id = result.get("selected_agent_id")
 
-        # Validate — must be a real agent ID
         valid_ids = {a["id"] for a in agents}
         if selected_id not in valid_ids:
             print(f"[GROQ Stage2] Invalid agent_id {selected_id!r}, using token fallback")
@@ -283,11 +309,6 @@ def _score_agents_by_tokens(
     token_weights: dict[str, int],
     agents: list[dict],
 ) -> list[dict]:
-    """
-    Pure Python token overlap scoring.
-    Score = sum of weight * (1 + log(overlap_depth)) for each matching token.
-    Load penalty: subtract 0.5 per active ticket on the agent.
-    """
     results = []
     for agent in agents:
         role_key = agent.get("agent_role_key", "")
@@ -302,23 +323,22 @@ def _score_agents_by_tokens(
                 score += weight * (1 + math.log(weight + 1))
                 matched.append(token)
 
-        # Load balancing penalty
-        load = agent.get("current_load", 0)
+        load  = agent.get("current_load", 0)
         score = max(0, score - (load * 0.5))
 
         profile_name = profile.get("display_name", role_key)
         rationale = (
-            f"Assigned to {profile_name} — matched skill tokens: {', '.join(matched[:5]) or 'general expertise'}. "
-            f"Token score: {score:.1f}."
+            f"Routed to {profile_name} — matched: {', '.join(matched[:5]) or 'general expertise'}. "
+            f"Score: {score:.1f}."
         )
 
         results.append({
-            "agent_id": agent["id"],
-            "agent_name": agent["full_name"],
-            "role_key": role_key,
-            "score": round(score, 2),
+            "agent_id":      agent["id"],
+            "agent_name":    agent["full_name"],
+            "role_key":      role_key,
+            "score":         round(score, 2),
             "matched_tokens": matched,
-            "rationale": rationale,
+            "rationale":     rationale,
         })
 
     return sorted(results, key=lambda x: x["score"], reverse=True)
@@ -326,34 +346,77 @@ def _score_agents_by_tokens(
 
 # ─── AI Reply Generation ──────────────────────────────────────────────────────
 
-AI_REPLY_PROMPT = """You are a helpful enterprise support agent for TicketIQ.
-Write a professional, empathetic, and actionable reply to this support ticket.
-Keep it under 150 words. Start directly with the help — no "I hope this email finds you well."
-Use the agent's expertise area to give a specific, useful response."""
+AI_REPLY_PROMPT = """You are an enterprise support agent for TicketIQ.
+You must write a specific, actionable reply based on the EXACT ticket content provided.
+
+YOUR ROLE SCOPES:
+- IT Support Assistant: passwords, VPN, hardware, software, email, printers, account access.
+  → Give concrete numbered troubleshooting steps tailored to the specific problem described.
+  → E.g. "My AI tool is not responding" → treat it as a software/app issue, give IT steps.
+
+- AI Intern: data analysis, reports, dashboards, summaries, trend analysis, documentation.
+  → Confirm exactly what you will produce, name the specific report/analysis requested.
+  → Give an estimated delivery time.
+
+- Junior Automation Support: broken workflows, failed scheduled jobs, integration failures.
+  → Ask for the specific workflow name and when it last worked, OR confirm the fix steps.
+
+STRICT RULES:
+1. Read the ticket title and description carefully — your reply must reference the actual problem.
+2. Never start with "Thank you for contacting" or "I hope this" — start with the action.
+3. No filler. No generic sentences. Every sentence must be specific to this ticket.
+4. Under 150 words.
+5. Do not offer to do things outside your role scope."""
 
 
-async def generate_ai_reply(title: str, description: str, department: str, category: str) -> str:
+async def generate_ai_reply(
+    title: str,
+    description: str,
+    department: str,
+    category: str,
+    agent_role: str = "it_support_technician",
+) -> str:
+    ROLE_LABEL = {
+        "ai_intern":             "AI Intern (Data & Reporting Analyst)",
+        "it_support_technician": "IT Support Assistant",
+        "junior_operations":     "Junior Automation Support",
+        "admin":                 "Support Manager",
+    }.get(agent_role, "Support Agent")
+
+    fallback_by_role = {
+        "ai_intern":             f"I've received your request for \"{title}\". I'll begin the analysis and have the report/summary ready for you shortly — I'll update this ticket once it's complete.",
+        "it_support_technician": f"I've picked up your ticket regarding \"{title}\". Let me walk you through the steps to resolve this — please try the following and let me know the outcome.",
+        "junior_operations":     f"I've logged your workflow issue: \"{title}\". Could you confirm the name of the workflow and when it last ran successfully? That will help me pinpoint the failure.",
+    }.get(agent_role, f"Your ticket \"{title}\" has been received and I'm reviewing it now.")
+
     if not settings.GROQ_API_KEY or settings.GROQ_API_KEY.startswith("gsk_your"):
-        return (
-            f"Thank you for submitting your {department} ticket regarding '{title}'. "
-            "Our team has received your request and will respond shortly. "
-            "Please include any additional details that may help us resolve this faster."
-        )
+        return fallback_by_role
+
     try:
         groq = get_groq_client()
         response = await groq.chat.completions.create(
             model=settings.GROQ_MODEL,
             messages=[
                 {"role": "system", "content": AI_REPLY_PROMPT},
-                {"role": "user",   "content": f"Department: {department}\nCategory: {category}\nTitle: {title}\n\nDescription: {description}"},
+                {
+                    "role": "user",
+                    "content": (
+                        f"You are the {ROLE_LABEL}.\n"
+                        f"Department: {department}\n"
+                        f"Category: {category}\n"
+                        f"Title: {title}\n\n"
+                        f"Employee's description:\n{description}\n\n"
+                        f"Write a specific, actionable reply as the {ROLE_LABEL}."
+                    ),
+                },
             ],
-            temperature=0.6,
-            max_tokens=200,
+            temperature=0.4,
+            max_tokens=220,
         )
-        return response.choices[0].message.content
+        return response.choices[0].message.content.strip()
     except Exception as e:
         print(f"[GROQ] Reply generation failed: {e}")
-        return f"Thank you for contacting {department} support. We have received your ticket and will respond shortly."
+        return fallback_by_role
 
 
 # ─── Fallback Classifiers ─────────────────────────────────────────────────────
@@ -365,8 +428,8 @@ def _keyword_dept(text: str) -> str:
             "network","wifi","email","access","printer","system","login","install",
             "crash","bug","error","server","internet","phone","monitor","account"] if k in text),
         "hr": sum(1 for k in ["leave","vacation","payslip","salary","contract","onboarding",
-            "offboarding","policy","benefits","performance","review","hr","employee",
-            "hiring","resignation","training","annual leave","sick leave","maternity"] if k in text),
+            "offboarding","policy","benefits","performance","review","hr","hiring",
+            "resignation","training","annual leave","sick leave","maternity"] if k in text),
         "finance": sum(1 for k in ["expense","reimbursement","invoice","payroll","budget",
             "purchase","vendor","payment","financial","claim","receipt","tax",
             "accounting","refund","purchase order","approval"] if k in text),
@@ -378,12 +441,45 @@ def _keyword_dept(text: str) -> str:
 
 
 def _extract_fallback_tokens(text: str) -> list[str]:
-    """Extract tokens from text using the full vocabulary."""
-    text = text.lower().replace(" ", "_")
-    all_tokens = []
-    for profile in AGENT_SKILL_PROFILES.values():
-        all_tokens.extend(profile["skill_tokens"])
-    return [t for t in set(all_tokens) if t.replace("_", " ") in text or t in text][:10]
+    """
+    Keyword-based fallback that maps problem type → agent tokens.
+    Determines which AGENT scope fits, not which department submitted.
+    """
+    text_lower = text.lower()
+
+    # IT Support signals
+    it_signals = ["password","reset","locked","vpn","wifi","network","laptop","printer",
+                  "email","outlook","teams","install","software","hardware","crash","login",
+                  "access","permission","account","computer","monitor","device"]
+    # AI/Data signals
+    data_signals = ["report","analysis","dashboard","trend","insight","summarize","summary",
+                    "research","data","analytics","document","faq","knowledge","turnover",
+                    "statistics","chart","graph","forecast","survey"]
+    # Automation signals — must be SPECIFIC workflow/job terms, not generic "not working"
+    automation_signals = ["workflow","workflow failure","scheduled job","scheduled task",
+                          "cron job","job failed","not triggering","power automate",
+                          "zapier","make.com","approval flow","leave workflow",
+                          "onboarding workflow","offboarding workflow","erp workflow",
+                          "integration failure","api integration","provisioning failure"]
+
+    it_score   = sum(1 for k in it_signals if k in text_lower)
+    data_score = sum(1 for k in data_signals if k in text_lower)
+    auto_score = sum(1 for k in automation_signals if k in text_lower)
+
+    # Generic "not responding / not working / crashed" without workflow context → IT
+    generic_broken = any(k in text_lower for k in [
+        "not responding", "not working", "not loading", "crashed", "can't open",
+        "keeps freezing", "slow", "broken", "won't open"
+    ])
+    if generic_broken and auto_score == 0:
+        return ["software", "system", "crash"]
+
+    if auto_score > 0 and auto_score >= data_score and auto_score >= it_score:
+        return ["workflow_failure", "automation", "integration"]
+    elif data_score >= it_score:
+        return ["report", "data_analysis", "analytics"]
+    else:
+        return ["password", "access", "system"]
 
 
 def _fallback_classify(title: str, description: str) -> dict:
@@ -394,14 +490,6 @@ def _fallback_classify(title: str, description: str) -> dict:
         "finance": "Finance", "operations": "Operations",
     }[dept_slug]
     tokens = _extract_fallback_tokens(text)
-    if not tokens:
-        # Default tokens by department
-        tokens = {
-            "hr": ["hr_policy", "employee"],
-            "it": ["software", "system"],
-            "finance": ["expense", "budget"],
-            "operations": ["office", "facilities"],
-        }[dept_slug]
 
     return {
         "department_slug":  dept_slug,

@@ -37,87 +37,110 @@ settings = Settings()
 # ─────────────────────────────────────────────────────────────────────────────
 
 AGENT_SKILL_PROFILES = {
+
+    # ── IT Support Assistant ───────────────────────────────────────────────────
+    # Entry-level IT support: devices, accounts, access, connectivity.
+    # Does NOT handle HR decisions, payroll, financial analysis, or automation.
+    "it_support_technician": {
+        "display_name": "IT Support Assistant",
+        "color": "#3B82F6",
+        "skill_tokens": [
+            "password", "password_reset", "account_lockout", "login", "authentication",
+            "2fa", "mfa", "account", "access", "permission", "user_account",
+            "email", "outlook", "microsoft_365", "teams", "sharepoint",
+            "vpn", "network", "wifi", "internet", "connectivity", "remote_access",
+            "laptop", "computer", "pc", "desktop", "hardware", "device",
+            "printer", "scanner", "monitor", "keyboard", "mouse", "phone", "mobile",
+            "software", "installation", "install", "update", "upgrade",
+            "crash", "bug", "error", "system", "troubleshoot",
+            "shared_drive", "file_access", "onedrive", "storage",
+            "new_employee_setup", "device_onboarding", "it_access",
+            "cybersecurity", "security_incident", "breach",
+            "backup", "data_recovery", "server", "infrastructure",
+        ],
+        "expertise_summary": (
+            "Entry-level IT support specialist. Handles password resets, account lockouts, "
+            "email access, printer problems, VPN connectivity, software installation, "
+            "laptop and desktop troubleshooting, Wi-Fi issues, user permissions, "
+            "Microsoft 365 support, basic hardware issues, and new employee device setup."
+        ),
+    },
+
+    # ── AI Intern ──────────────────────────────────────────────────────────────
+    # Data, reporting, and business intelligence intern.
+    # Does NOT handle passwords, hardware, payroll approvals, or HR policy decisions.
     "ai_intern": {
         "display_name": "AI Intern",
         "color": "#8B5CF6",
         "skill_tokens": [
-            # HR & People Operations
-            "leave", "annual_leave", "sick_leave", "maternity", "paternity", "vacation",
-            "payslip", "salary", "pay", "compensation", "bonus",
-            "onboarding", "offboarding", "new_hire", "resignation", "termination",
-            "hr_policy", "policy", "contract", "employment", "benefits", "pension",
-            "performance_review", "appraisal", "training", "learning", "development",
-            "workplace_conduct", "harassment", "conflict", "disciplinary",
-            "job_change", "promotion", "transfer", "probation",
-            "health_insurance", "medical_aid", "wellbeing",
+            # Core data & reporting
+            "report", "reporting", "data_analysis", "analysis", "analytics",
+            "dashboard", "dashboard_assistance", "visualisation", "visualization",
+            "trend_analysis", "trends", "insights", "business_intelligence",
+            "data_cleaning", "data_quality", "dataset",
+            "document_summary", "summarize", "summarization", "meeting_notes",
+            "faq", "faq_generation", "knowledge_base", "documentation",
+            "research", "research_task", "investigation",
+            "employee_turnover", "turnover_report", "survey_analysis",
+            "monthly_report", "quarterly_report", "annual_report",
+            "support_trends", "ticket_analytics", "performance_report",
+            "financial_report", "operational_report", "hr_report",
+            "ai_insights", "predictive", "forecast",
+            # AI-assisted work requests (user wants the intern TO DO AI work for them)
+            "ai_assistance", "ai_chatbot_help", "ai_tool_request",
+            "ai_powered_analysis", "ai_powered_report", "ai_powered_research",
+            "copilot_assistance", "ai_recommendation", "ai_summary",
+            "generate_content", "content_generation", "text_analysis",
+            "sentiment_analysis", "data_extraction", "pattern_recognition",
+            "intelligent_search", "smart_search", "ai_query",
         ],
         "expertise_summary": (
-            "Specialist in Human Resources and people operations. "
-            "Handles all HR-related matters: leave requests, payslips, employment policies, "
-            "onboarding/offboarding, performance reviews, benefits, and employee relations."
+            "AI and data intern. Handles data analysis, report generation, dashboard assistance, "
+            "research tasks, knowledge base creation, document summarization, trend analysis, "
+            "data cleaning, AI-powered insights, FAQ generation, and business intelligence. "
+            "Also assists employees who need AI tools to help with analysis, research, or "
+            "content tasks. Does NOT fix broken software, reset passwords, or handle HR policy."
         ),
     },
-    "it_support_technician": {
-        "display_name": "IT Support Technician",
-        "color": "#3B82F6",
-        "skill_tokens": [
-            # IT / Technical
-            "password", "vpn", "network", "wifi", "internet", "connectivity",
-            "laptop", "computer", "pc", "desktop", "hardware", "device",
-            "software", "installation", "install", "update", "upgrade", "crash",
-            "bug", "error", "system", "server", "infrastructure", "cloud",
-            "email", "outlook", "teams", "slack", "access", "permission",
-            "account", "login", "authentication", "2fa", "mfa", "security",
-            "printer", "scanner", "monitor", "keyboard", "mouse", "phone",
-            "mobile", "backup", "data_recovery", "cybersecurity", "breach",
-            "database", "api", "integration", "deployment",
-            # Finance / Financial Systems
-            "expense", "expense_claim", "reimbursement", "invoice", "receipt",
-            "payroll", "salary_discrepancy", "budget", "purchase_order",
-            "vendor_payment", "financial_report", "accounting_software",
-            "tax", "vat", "audit", "financial_system", "erp", "sap",
-            "approval_workflow", "cost_centre", "procurement_system",
-        ],
-        "expertise_summary": (
-            "Technical specialist covering IT infrastructure and financial systems. "
-            "Handles hardware, software, networking, system access, cybersecurity, "
-            "and all financial processes: expenses, payroll, invoices, budgets, "
-            "purchase orders, and accounting software."
-        ),
-    },
+
+    # ── Junior Automation Support ──────────────────────────────────────────────
+    # Workflow and process automation specialist.
+    # Does NOT handle passwords, hardware, payroll decisions, or data analysis.
     "junior_operations": {
-        "display_name": "Junior Operations",
+        "display_name": "Junior Automation Support",
         "color": "#F59E0B",
         "skill_tokens": [
-            # Facilities & Physical Workspace
-            "office", "facilities", "maintenance", "repair", "building",
-            "desk", "chair", "furniture", "ergonomics",
-            "meeting_room", "conference_room", "booking",
-            "cleaning", "housekeeping", "sanitization",
-            "parking", "access_card", "security_badge", "key_fob",
-            "air_conditioning", "heating", "lighting", "plumbing", "elevator",
-            # Logistics & Procurement
-            "supplies", "stationery", "office_supplies", "consumables",
-            "delivery", "courier", "shipment", "inventory",
-            "travel", "flight", "hotel", "accommodation", "car_hire",
-            "event", "event_logistics", "catering", "venue",
-            "vendor", "supplier", "procurement", "purchase_request",
-            "company_vehicle", "fleet", "asset_management",
-            "health_safety", "fire_safety", "first_aid", "incident",
+            "workflow", "workflow_failure", "automation", "automation_failure",
+            "process_automation", "automated_process", "business_process",
+            "scheduled_job", "scheduled_task", "cron_job", "job_failure",
+            "integration", "integration_failure", "api_integration",
+            "notification_failure", "alert_failure", "email_notification",
+            "approval_workflow", "approval_automation", "approval_not_triggering",
+            "onboarding_workflow", "offboarding_workflow",
+            "leave_workflow", "leave_approval_workflow",
+            "finance_workflow", "finance_approval",
+            "ticket_workflow", "escalation_automation",
+            "low_code", "no_code", "power_automate", "zapier", "make",
+            "erp_workflow", "system_integration", "provisioning_failure",
         ],
         "expertise_summary": (
-            "Operations specialist for physical workspace, logistics, and procurement. "
-            "Handles facilities maintenance, office supplies, meeting room setup, "
-            "building access, travel bookings, event logistics, vendor management, "
-            "deliveries, company vehicles, and health & safety."
+            "Junior automation and workflow support specialist. Handles workflow failures, "
+            "process automation issues, scheduled job failures, integration troubleshooting, "
+            "approval workflow problems, notification failures, and low-code/no-code platform issues. "
+            "Does NOT handle passwords, hardware, payroll, or data analysis."
         ),
     },
 }
 
-# Departments
+
+# Departments — employees submit tickets, they do NOT resolve them
 DEPARTMENTS = [
-    {"name": "Human Resources",       "slug": "hr",         "color": "#8B5CF6", "description": "Employee relations, benefits, policies, leave"},
-    {"name": "Information Technology","slug": "it",         "color": "#3B82F6", "description": "Hardware, software, network, system access"},
-    {"name": "Finance",               "slug": "finance",    "color": "#10B981", "description": "Expenses, payroll, invoices, budget"},
-    {"name": "Operations",            "slug": "operations", "color": "#F59E0B", "description": "Facilities, logistics, procurement, maintenance"},
+    {"name": "Human Resources",        "slug": "hr",         "color": "#8B5CF6",
+     "description": "Employee relations, benefits, policies, leave — submits tickets only"},
+    {"name": "Information Technology", "slug": "it",         "color": "#3B82F6",
+     "description": "Hardware, software, network, system access — submits tickets only"},
+    {"name": "Finance",                "slug": "finance",    "color": "#10B981",
+     "description": "Expenses, payroll, invoices, budget — submits tickets only"},
+    {"name": "Operations",             "slug": "operations", "color": "#F59E0B",
+     "description": "Facilities, logistics, procurement, maintenance — submits tickets only"},
 ]

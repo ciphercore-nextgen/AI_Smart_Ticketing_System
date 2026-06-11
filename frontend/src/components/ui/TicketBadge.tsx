@@ -1,57 +1,50 @@
-import clsx from 'clsx'
+'use client'
 
-const PRIORITY_STYLES: Record<string, string> = {
-  critical: 'bg-red-500/20 text-red-400 border border-red-500/30',
-  high:     'bg-orange-500/20 text-orange-400 border border-orange-500/30',
-  medium:   'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30',
-  low:      'bg-green-500/20 text-green-400 border border-green-500/30',
+const PRIORITY_STYLES: Record<string, { bg: string; color: string; border: string; dot: string; pulse?: boolean }> = {
+  critical: { bg: 'var(--danger-bg)',  color: 'var(--danger)',  border: 'color-mix(in srgb, var(--danger) 30%, transparent)',  dot: 'var(--danger)',  pulse: true  },
+  high:     { bg: 'rgba(249,115,22,.1)', color: '#f97316',      border: 'rgba(249,115,22,.3)',                                  dot: '#f97316'                     },
+  medium:   { bg: 'var(--warning-bg)', color: 'var(--warning)', border: 'color-mix(in srgb, var(--warning) 30%, transparent)', dot: 'var(--warning)'               },
+  low:      { bg: 'var(--success-bg)', color: 'var(--success)', border: 'color-mix(in srgb, var(--success) 30%, transparent)', dot: 'var(--success)'               },
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  open:             'bg-blue-500/20 text-blue-400',
-  pending:          'bg-yellow-500/20 text-yellow-400',
-  assigned:         'bg-cyan-500/20 text-cyan-400',
-  in_progress:      'bg-purple-500/20 text-purple-400',
-  escalated:        'bg-red-500/20 text-red-400',
-  waiting_for_user: 'bg-gray-500/20 text-gray-400',
-  resolved:         'bg-green-500/20 text-green-400',
-  closed:           'bg-gray-600/20 text-gray-500',
-}
-
-const PRIORITY_DOTS: Record<string, string> = {
-  critical: 'bg-red-400 animate-pulse',
-  high:     'bg-orange-400',
-  medium:   'bg-yellow-400',
-  low:      'bg-green-400',
+const STATUS_STYLES: Record<string, { bg: string; color: string }> = {
+  open:             { bg: 'color-mix(in srgb, #3b82f6 12%, transparent)', color: '#60a5fa' },
+  pending:          { bg: 'var(--warning-bg)',                             color: 'var(--warning)' },
+  assigned:         { bg: 'color-mix(in srgb, #06b6d4 12%, transparent)', color: '#22d3ee' },
+  in_progress:      { bg: 'var(--accent-subtle)',                          color: 'var(--accent-text)' },
+  escalated:        { bg: 'var(--danger-bg)',                              color: 'var(--danger)' },
+  waiting_for_user: { bg: 'var(--bg-muted)',                               color: 'var(--text-3)' },
+  resolved:         { bg: 'var(--success-bg)',                             color: 'var(--success)' },
+  closed:           { bg: 'var(--bg-muted)',                               color: 'var(--text-3)' },
 }
 
 export function PriorityBadge({ priority }: { priority: string }) {
+  const s = PRIORITY_STYLES[priority] || PRIORITY_STYLES.low
   return (
-    <span className={clsx(
-      'inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full',
-      PRIORITY_STYLES[priority] || PRIORITY_STYLES.low
-    )}>
-      <span className={clsx('w-1.5 h-1.5 rounded-full', PRIORITY_DOTS[priority] || 'bg-gray-400')} />
+    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+      style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.pulse ? 'animate-pulse' : ''}`}
+        style={{ background: s.dot }} />
       {priority?.toUpperCase()}
     </span>
   )
 }
 
 export function StatusBadge({ status }: { status: string }) {
+  const s = STATUS_STYLES[status] || STATUS_STYLES.open
   return (
-    <span className={clsx(
-      'inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full',
-      STATUS_STYLES[status] || STATUS_STYLES.open
-    )}>
-      {status?.replace(/_/g, ' ').toUpperCase()}
+    <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full"
+      style={{ background: s.bg, color: s.color }}>
+      {status?.replace(/_/g, ' ')}
     </span>
   )
 }
 
 export function DepartmentBadge({ name, color = '#3B82F6' }: { name: string; color?: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-gray-800 text-gray-300">
-      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+    <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
+      style={{ background: 'var(--bg-muted)', color: 'var(--text-2)', border: '1px solid var(--border)' }}>
+      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
       {name}
     </span>
   )

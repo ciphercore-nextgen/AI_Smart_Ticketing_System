@@ -43,9 +43,9 @@ export default function TicketsPage() {
   const role = user?.role || 'employee'
   const titleMap: Record<string, string> = {
     employee:              'My Tickets',
-    ai_intern:             'HR Queue',
-    it_support_technician: 'IT & Finance Queue',
-    junior_operations:     'Operations Queue',
+    ai_intern:             'Data & Reporting Queue',
+    it_support_technician: 'IT Support Queue',
+    junior_operations:     'Automation Queue',
     admin:                 'All Tickets',
     super_admin:           'All Tickets',
   }

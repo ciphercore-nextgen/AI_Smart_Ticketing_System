@@ -10,9 +10,9 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      # Override DB path to write inside the named volume
+      # SQLite lives inside the named volume — never use a relative path
       DATABASE_URL: sqlite+aiosqlite:////app/data/ticketiq.db
-      # Allow requests from the browser (host machine) AND the frontend container
+      # Allow browser + frontend container
       CORS_ORIGINS: "http://localhost:3000,http://frontend:3000,http://ticketiq-frontend:3000"
     volumes:
       - sqlite_data:/app/data
@@ -21,15 +21,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 15s
+      start_period: 20s
 
   frontend:
     build:
       context: ./frontend
       args:
-        # Passed at build time so Next.js can bake NEXT_PUBLIC_* into the bundle.
-        # At runtime the browser calls the backend on the HOST (port 8000),
-        # not through Docker's internal network — so localhost:8000 is correct here.
+        # Browser calls the backend on the HOST — localhost:8000 is correct
         NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
     container_name: ticketiq-frontend
     restart: unless-stopped
@@ -41,3 +39,4 @@ services:
 
 volumes:
   sqlite_data:
+    name: ticketiq_sqlite_data

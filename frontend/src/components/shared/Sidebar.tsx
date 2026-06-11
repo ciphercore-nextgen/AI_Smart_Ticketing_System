@@ -59,7 +59,7 @@ const ROLE_LABELS: Record<string, string> = {
   employee:              'Employee',
   ai_intern:             'AI Intern',
   it_support_technician: 'IT Support',
-  junior_operations:     'Jr Operations',
+  junior_operations:     'Jr Automation Support',
   admin:                 'Administrator',
   super_admin:           'Super Admin',
 }

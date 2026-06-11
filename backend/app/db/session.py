@@ -1,6 +1,22 @@
+from pathlib import Path
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from app.core.config import settings
 from app.models.models import Base
+
+# ── Resolve DB path to absolute so SQLite always finds it ────────────────────
+# Handles Windows + Python 3.14 where relative paths can fail at startup.
+def _resolved_db_url(url: str) -> str:
+    if url.startswith("sqlite+aiosqlite:///"):
+        raw = url[len("sqlite+aiosqlite:///"):]
+        if raw.startswith("./") or not Path(raw).is_absolute():
+            # Anchor to the backend folder (two levels up from this file)
+            backend_dir = Path(__file__).resolve().parent.parent.parent
+            db_path = (backend_dir / raw.lstrip("./")).resolve()
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            return f"sqlite+aiosqlite:///{db_path}"
+    return url
+
+DATABASE_URL = _resolved_db_url(settings.DATABASE_URL)
 
 # SQLite: no pool_size/max_overflow (not supported by StaticPool)
 connect_args = {}
@@ -9,7 +25,7 @@ engine_kwargs = {
     "pool_pre_ping": True,
 }
 
-if settings.DATABASE_URL.startswith("sqlite"):
+if DATABASE_URL.startswith("sqlite"):
     from sqlalchemy.pool import StaticPool
     connect_args = {"check_same_thread": False}
     engine_kwargs["connect_args"] = connect_args
@@ -18,7 +34,7 @@ else:
     engine_kwargs["pool_size"] = 10
     engine_kwargs["max_overflow"] = 20
 
-engine = create_async_engine(settings.DATABASE_URL, **engine_kwargs)
+engine = create_async_engine(DATABASE_URL, **engine_kwargs)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,

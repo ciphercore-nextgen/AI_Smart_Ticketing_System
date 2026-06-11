@@ -21,5 +21,5 @@ USER appuser
 
 EXPOSE 8000
 
-# Start the API; uvicorn binds 0.0.0.0 so the health-check and frontend can reach it
+# Start the API; database is seeded automatically on first startup via main.py
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

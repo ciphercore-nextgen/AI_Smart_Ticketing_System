@@ -321,9 +321,10 @@ async def get_ai_reply(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
-    dept_name = ticket.department.name if ticket.department else "Support"
-    category  = (ticket.ai_classification or {}).get("category", "General")
-    reply = await generate_ai_reply(ticket.title, ticket.description, dept_name, category)
+    dept_name  = ticket.department.name if ticket.department else "Support"
+    category   = (ticket.ai_classification or {}).get("category", "General")
+    agent_role = getattr(current_user, "agent_role_key", None) or "it_support_technician"
+    reply = await generate_ai_reply(ticket.title, ticket.description, dept_name, category, agent_role)
     return {"reply": reply}
 
 

@@ -4,18 +4,25 @@ import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/shared/DashboardLayout'
 import SelfHelpPanel from '@/components/ui/SelfHelpPanel'
 import { ticketsApi } from '@/lib/api'
-import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import {
-  Cpu, Send, ChevronRight, AlertCircle,
-  Zap, CheckCircle, Info, Lightbulb
+  Cpu, Send, ChevronRight, CheckCircle,
+  Info, Lightbulb, Monitor, Workflow, BarChart3,
 } from 'lucide-react'
 
-const DEPT_INFO = [
-  { slug: 'hr',         name: 'Human Resources',        color: '#8B5CF6', icon: '👥', examples: ['Leave requests', 'Payslip queries', 'Policy questions', 'Onboarding help'] },
-  { slug: 'it',         name: 'Information Technology', color: '#3B82F6', icon: '💻', examples: ['Password reset', 'VPN access', 'Hardware issues', 'Software installs'] },
-  { slug: 'finance',    name: 'Finance',                color: '#10B981', icon: '💰', examples: ['Expense claims', 'Payroll queries', 'Purchase orders', 'Budget approvals'] },
-  { slug: 'operations', name: 'Operations',             color: '#F59E0B', icon: '🏢', examples: ['Facilities issues', 'Office supplies', 'Travel bookings', 'Building access'] },
+const ROUTING_GUIDE = [
+  {
+    icon: Monitor, color: '#3b82f6', agent: 'IT Support Assistant',
+    triggers: ['Password or account locked', 'Can\'t connect to VPN or Wi-Fi', 'Laptop / hardware issue', 'Software crash or not responding', 'Email or Outlook problem', 'New device setup needed'],
+  },
+  {
+    icon: Cpu, color: '#8b5cf6', agent: 'AI Intern',
+    triggers: ['Need a report generated', 'Data analysis or dashboard', 'Summarize a document', 'Research task', 'Create FAQ or knowledge article', 'Trend analysis needed'],
+  },
+  {
+    icon: Workflow, color: '#f59e0b', agent: 'Junior Automation Support',
+    triggers: ['A workflow has stopped working', 'Approval emails not sending', 'Scheduled automation failed', 'Integration is broken', 'Onboarding/offboarding workflow issue', 'Power Automate / Zapier problem'],
+  },
 ]
 
 export default function NewTicketPage() {
@@ -34,7 +41,7 @@ export default function NewTicketPage() {
       const { data } = await ticketsApi.create({ title, description })
       setResult(data)
       setSubmitted(true)
-      toast.success('Ticket submitted — AI is generating self-help steps!')
+      toast.success('Ticket submitted — AI is routing your request!')
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Failed to submit ticket')
     } finally {
@@ -42,93 +49,109 @@ export default function NewTicketPage() {
     }
   }
 
-  const ai   = result?.ai
-  const dept = DEPT_INFO.find(d => d.slug === result?.department?.slug)
+  const ai = result?.ai
 
   // ── Success screen ──────────────────────────────────────────────────────────
   if (submitted && result) {
+    const agentCfg = ROUTING_GUIDE.find(r =>
+      result.assigned_agent?.agent_role_key &&
+      r.agent.toLowerCase().includes(result.assigned_agent.agent_role_key.split('_')[0])
+    ) || ROUTING_GUIDE[0]
+
     return (
-      <DashboardLayout title="Ticket Submitted" subtitle="AI has routed your request and is preparing self-help steps">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="max-w-2xl mx-auto space-y-4"
-        >
-          {/* Success card */}
-          <div className="glass-card rounded-xl p-5 border border-green-500/20">
+      <DashboardLayout title="Ticket Submitted" subtitle="Your request has been routed to the right agent">
+        <div style={{ maxWidth: 680 }} className="mx-auto space-y-4">
+
+          {/* Success */}
+          <div className="card rounded-xl p-5"
+            style={{ borderColor: 'color-mix(in srgb, var(--success) 25%, transparent)' }}>
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-green-500/15 flex items-center justify-center flex-shrink-0">
-                <CheckCircle className="w-5 h-5 text-green-400" />
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ background: 'var(--success-bg)' }}>
+                <CheckCircle className="w-5 h-5" style={{ color: 'var(--success)' }} />
               </div>
               <div>
-                <p className="text-white font-semibold">Ticket Created Successfully</p>
-                <p className="text-xs text-gray-500 font-mono">{result.ticket_number}</p>
+                <p className="font-semibold" style={{ color: 'var(--text)' }}>Ticket Created</p>
+                <p className="mono text-xs" style={{ color: 'var(--text-3)' }}>{result.ticket_number}</p>
               </div>
-              <span className={`ml-auto text-xs font-medium px-2 py-1 rounded-full capitalize ${
-                result.priority === 'critical' ? 'bg-red-500/15 text-red-400' :
-                result.priority === 'high'     ? 'bg-orange-500/15 text-orange-400' :
-                result.priority === 'medium'   ? 'bg-yellow-500/15 text-yellow-400' :
-                                                  'bg-green-500/15 text-green-400'
-              }`}>
+              <span className="ml-auto text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
+                style={{
+                  background: result.priority === 'critical' ? 'var(--danger-bg)'  :
+                              result.priority === 'high'     ? 'rgba(249,115,22,.1)' :
+                              result.priority === 'medium'   ? 'var(--warning-bg)' : 'var(--success-bg)',
+                  color:      result.priority === 'critical' ? 'var(--danger)'  :
+                              result.priority === 'high'     ? '#f97316' :
+                              result.priority === 'medium'   ? 'var(--warning)' : 'var(--success)',
+                }}>
                 {result.priority} priority
               </span>
             </div>
-            <h2 className="text-base font-bold text-white">{result.title}</h2>
+            <p className="font-bold" style={{ color: 'var(--text)' }}>{result.title}</p>
           </div>
 
-          {/* AI Routing result */}
-          <div className="glass-card rounded-xl p-5 border border-blue-500/20">
-            <div className="flex items-center gap-2 mb-3">
-              <Cpu className="w-4 h-4 text-blue-400" />
-              <span className="text-sm font-semibold text-blue-400">AI Routing Result</span>
+          {/* AI routing result */}
+          <div className="card rounded-xl p-5"
+            style={{ borderColor: 'color-mix(in srgb, var(--accent) 20%, transparent)' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <Cpu className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--accent-text)' }}>AI Routing Result</span>
               {ai?.confidence && (
-                <span className="ml-auto text-xs bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/20">
+                <span className="ml-auto badge" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-text)' }}>
                   {Math.round((ai.confidence || 0) * 100)}% confidence
                 </span>
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-gray-900/60 rounded-lg p-3">
-                <p className="text-xs text-gray-500 mb-1">Routed to</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{dept?.icon || '🏢'}</span>
-                  <div>
-                    <p className="text-sm font-semibold text-white">{result.department?.name || '—'}</p>
-                    <p className="text-xs text-gray-500">{ai?.category || 'General Support'}</p>
-                  </div>
-                </div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="rounded-lg p-3" style={{ background: 'var(--bg-subtle)' }}>
+                <p className="text-xs mb-1" style={{ color: 'var(--text-3)' }}>Submitting Department</p>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{result.department?.name || '—'}</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>{ai?.category || 'General Support'}</p>
               </div>
-
-              <div className="bg-gray-900/60 rounded-lg p-3">
-                <p className="text-xs text-gray-500 mb-1">Assigned Agent</p>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 text-sm font-bold flex-shrink-0">
-                    {result.assigned_agent?.full_name?.charAt(0) || '?'}
+              <div className="rounded-lg p-3" style={{ background: 'var(--bg-subtle)' }}>
+                <p className="text-xs mb-1" style={{ color: 'var(--text-3)' }}>Assigned Agent</p>
+                {result.assigned_agent ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                      style={{ background: 'var(--accent-subtle)', color: 'var(--accent-text)' }}>
+                      {result.assigned_agent.full_name?.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{result.assigned_agent.full_name}</p>
+                      <p className="text-xs capitalize" style={{ color: 'var(--text-3)' }}>
+                        {(result.assigned_agent.agent_role_key || '').replace(/_/g,' ')}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-white">{result.assigned_agent?.full_name || 'Being assigned...'}</p>
-                    <p className="text-xs text-gray-500 capitalize">{(result.assigned_agent?.agent_role_key || '').replace(/_/g, ' ')}</p>
-                  </div>
-                </div>
+                ) : <p className="text-sm" style={{ color: 'var(--text-3)' }}>Being assigned…</p>}
               </div>
             </div>
 
             {ai?.routing_rationale && (
-              <div className="mt-3 bg-blue-500/5 border border-blue-500/10 rounded-lg p-3">
-                <p className="text-xs text-gray-400 flex items-start gap-1.5">
-                  <Info className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" />
-                  {ai.routing_rationale}
-                </p>
+              <div className="rounded-lg p-3 flex items-start gap-2"
+                style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-subtle)' }}>
+                <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
+                <p className="text-xs" style={{ color: 'var(--text-3)' }}>{ai.routing_rationale}</p>
+              </div>
+            )}
+
+            {ai?.skill_tokens && ai.skill_tokens.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {ai.skill_tokens.slice(0, 6).map((t: string) => (
+                  <span key={t} className="mono badge"
+                    style={{ background: 'var(--accent-subtle)', color: 'var(--accent-text)', fontSize: 11 }}>
+                    {t}
+                  </span>
+                ))}
               </div>
             )}
           </div>
 
-          {/* ── Self-Help Panel — auto-loads immediately ────────────────────── */}
+          {/* Self-help steps */}
           <div>
-            <div className="flex items-center gap-2 mb-2 px-1">
-              <Lightbulb className="w-4 h-4 text-amber-400" />
-              <p className="text-sm font-semibold text-amber-300">
+            <div className="flex items-center gap-2 mb-2">
+              <Lightbulb className="w-4 h-4" style={{ color: '#f59e0b' }} />
+              <p className="text-sm font-semibold" style={{ color: '#f59e0b' }}>
                 Things to try while your ticket is being reviewed
               </p>
             </div>
@@ -137,106 +160,100 @@ export default function NewTicketPage() {
 
           {/* Actions */}
           <div className="flex gap-3">
-            <button
-              onClick={() => router.push(`/tickets/${result.id}`)}
-              className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl py-3 text-sm font-medium transition"
-            >
-              View Full Ticket <ChevronRight className="w-4 h-4" />
+            <button onClick={() => router.push(`/tickets/${result.id}`)}
+              className="btn btn-primary flex-1 justify-center">
+              View Ticket <ChevronRight className="w-4 h-4" />
             </button>
-            <button
-              onClick={() => { setSubmitted(false); setTitle(''); setDescription(''); setResult(null) }}
-              className="flex items-center justify-center bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl px-5 py-3 text-sm font-medium transition"
-            >
+            <button onClick={() => { setSubmitted(false); setTitle(''); setDescription(''); setResult(null) }}
+              className="btn btn-secondary px-5">
               New Ticket
             </button>
           </div>
 
-        </motion.div>
+        </div>
       </DashboardLayout>
     )
   }
 
   // ── Submission form ─────────────────────────────────────────────────────────
   return (
-    <DashboardLayout title="Submit a Ticket" subtitle="AI will classify, route, and generate self-help steps instantly">
-      <div className="max-w-3xl mx-auto space-y-5">
+    <DashboardLayout title="Submit a Ticket" subtitle="Describe your problem — AI routes it to the right agent automatically">
+      <div style={{ maxWidth: 740 }} className="mx-auto space-y-5">
 
-        {/* Department guide */}
-        <div className="glass-card rounded-xl p-5 border border-gray-800/60">
+        {/* Routing guide */}
+        <div className="card rounded-xl p-5">
           <div className="flex items-center gap-2 mb-3">
-            <Cpu className="w-4 h-4 text-blue-400" />
-            <span className="text-sm font-semibold text-gray-300">AI automatically routes to the correct department & agent</span>
+            <Cpu className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+            <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+              AI routes by problem type — not your department
+            </p>
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-            {DEPT_INFO.map(d => (
-              <div key={d.slug} className="rounded-lg bg-gray-900/60 p-3 border border-gray-800/40">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-sm">{d.icon}</span>
-                  <span className="text-xs font-semibold" style={{ color: d.color }}>{d.name}</span>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            {ROUTING_GUIDE.map(g => (
+              <div key={g.agent} className="rounded-lg p-3"
+                style={{
+                  background: `color-mix(in srgb, ${g.color} 6%, var(--bg-subtle))`,
+                  border: `1px solid color-mix(in srgb, ${g.color} 20%, transparent)`,
+                }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <g.icon className="w-3.5 h-3.5" style={{ color: g.color }} />
+                  <p className="text-xs font-bold" style={{ color: g.color }}>{g.agent}</p>
                 </div>
-                {d.examples.map(ex => (
-                  <p key={ex} className="text-xs text-gray-600">· {ex}</p>
+                {g.triggers.map(t => (
+                  <p key={t} className="text-xs" style={{ color: 'var(--text-3)', marginBottom: 2 }}>· {t}</p>
                 ))}
               </div>
             ))}
           </div>
         </div>
 
-        {/* What happens after */}
-        <div className="glass-card rounded-xl p-4 border border-amber-500/20 flex items-start gap-3">
-          <Lightbulb className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+        {/* After-submit info */}
+        <div className="card rounded-xl p-4 flex items-start gap-3"
+          style={{ borderColor: 'rgba(245,158,11,.25)' }}>
+          <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#f59e0b' }} />
           <div>
-            <p className="text-sm font-semibold text-amber-300">After you submit</p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              AI instantly routes your ticket to the best agent AND generates personalised self-help
-              steps you can try right now — so you're not stuck waiting with nothing to do.
+            <p className="text-sm font-semibold" style={{ color: '#f59e0b' }}>After you submit</p>
+            <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--text-3)' }}>
+              AI instantly classifies the problem, routes it to the correct agent, and generates personalised
+              self-help steps you can try right now — so you're not stuck waiting.
             </p>
           </div>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="glass-card rounded-xl p-6 border border-gray-800/60 space-y-4">
+        <form onSubmit={handleSubmit} className="card rounded-xl p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
-              Subject <span className="text-red-400">*</span>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>
+              Subject <span style={{ color: 'var(--danger)' }}>*</span>
             </label>
-            <input
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              required
+            <input value={title} onChange={e => setTitle(e.target.value)} required
               placeholder="e.g. Cannot connect to VPN from home"
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-            />
+              className="input" />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
-              Description <span className="text-red-400">*</span>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>
+              Description <span style={{ color: 'var(--danger)' }}>*</span>
             </label>
-            <textarea
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              required
+            <textarea value={description} onChange={e => setDescription(e.target.value)} required
               rows={6}
-              placeholder="Describe your issue in detail. Include error messages, when it started, and what you've already tried. More detail = better self-help steps."
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition resize-none"
-            />
-            <p className="text-xs text-gray-600 mt-1">{description.length} chars · More detail = better AI self-help steps</p>
+              placeholder="Describe your issue in detail. Include error messages, when it started, and what you've already tried. The more detail you give, the better the AI routing and self-help steps."
+              className="input resize-none" />
+            <p className="text-xs mt-1" style={{ color: 'var(--text-3)' }}>
+              {description.length} chars · More detail = better routing accuracy
+            </p>
           </div>
 
           <div className="flex items-center gap-3 pt-1">
-            <button
-              type="submit"
-              disabled={loading || !title.trim() || !description.trim()}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white rounded-lg px-6 py-3 font-medium text-sm transition"
-            >
+            <button type="submit" disabled={loading || !title.trim() || !description.trim()}
+              className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
               {loading
-                ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> AI is routing...</>
+                ? <><span className="w-4 h-4 rounded-full animate-spin border-2 border-white/30 border-t-white" /> Routing…</>
                 : <><Send className="w-4 h-4" /> Submit Ticket</>
               }
             </button>
-            <p className="text-xs text-gray-600 flex items-center gap-1">
-              <Zap className="w-3 h-3 text-blue-500" /> Powered by GROQ LLaMA 3
+            <p className="text-xs flex items-center gap-1" style={{ color: 'var(--text-3)' }}>
+              <BarChart3 className="w-3 h-3" style={{ color: 'var(--accent)' }} /> Powered by GROQ LLaMA 3
             </p>
           </div>
         </form>

@@ -105,10 +105,28 @@ FALLBACK_TEMPLATES = {
 def _build_system_prompt(tone: ToneType, agent_role: str, context: str = "") -> str:
     tone_instruction = TONE_INSTRUCTIONS[tone]
     role_context = {
-        "ai_intern":             "You are an AI Intern handling HR and people operations queries.",
-        "it_support_technician": "You are an IT Support Technician handling technical and financial system issues.",
-        "junior_operations":     "You are a Junior Operations Agent handling facilities, logistics, and procurement.",
-        "admin":                 "You are a Support Manager with full visibility across all departments.",
+        "ai_intern": (
+            "You are the AI Intern — a data and reporting analyst. "
+            "You produce reports, dashboards, summaries, trend analyses, FAQs, and documentation. "
+            "Your replies confirm what analysis/report you will produce and give a delivery timeline. "
+            "You do NOT fix IT issues, reset passwords, or handle HR approvals."
+        ),
+        "it_support_technician": (
+            "You are the IT Support Assistant — an IT technician. "
+            "You handle passwords, VPN, hardware, software, email, printers, account access, and device issues. "
+            "Your replies give specific, numbered troubleshooting steps tailored to the exact problem. "
+            "You do NOT do data analysis, payroll, or workflow automation."
+        ),
+        "junior_operations": (
+            "You are Junior Automation Support — a workflow and automation specialist. "
+            "You handle broken workflows, failed scheduled jobs, integration failures, and automation bugs. "
+            "Your replies ask for the specific workflow name and failure details, or confirm the fix steps. "
+            "You do NOT handle passwords, hardware, or data analysis."
+        ),
+        "admin": (
+            "You are a Support Manager with full visibility across all departments. "
+            "You provide oversight, escalation management, and professional status updates."
+        ),
     }.get(agent_role, "You are a professional enterprise support agent.")
 
     return f"""You are TicketIQ's automated response engine.

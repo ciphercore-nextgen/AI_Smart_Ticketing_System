@@ -14,7 +14,8 @@ BACKEND = os.path.abspath(os.path.join(HERE, '..', 'backend'))
 sys.path.insert(0, BACKEND)
 os.chdir(BACKEND)   # CRITICAL: db file created in backend folder
 
-# Load .env
+# Load .env for non-DB vars only (GROQ key, SECRET_KEY etc.)
+# DATABASE_URL is always forced to a local path — never use the Docker path from .env
 env_file = os.path.join(BACKEND, '.env')
 if os.path.exists(env_file):
     with open(env_file) as f:
@@ -22,15 +23,19 @@ if os.path.exists(env_file):
             line = line.strip()
             if line and not line.startswith('#') and '=' in line:
                 k, v = line.split('=', 1)
-                os.environ.setdefault(k.strip(), v.strip())
+                k = k.strip()
+                if k != 'DATABASE_URL':   # never inherit Docker DB path
+                    os.environ.setdefault(k, v.strip())
 
-# Fallback env vars
-os.environ.setdefault('DATABASE_URL', 'sqlite+aiosqlite:///./ticketiq.db')
+# Always use a local SQLite file right inside the backend folder
+LOCAL_DB = os.path.join(BACKEND, 'ticketiq.db')
+DB_URL   = f'sqlite+aiosqlite:///{LOCAL_DB}'
+os.environ['DATABASE_URL'] = DB_URL
 os.environ.setdefault('SECRET_KEY', 'dev-secret-key-32-chars-minimum!!')
 os.environ.setdefault('GROQ_API_KEY', '')
 
 print(f"📁 Working dir : {os.getcwd()}")
-print(f"🗄  Database URL: {os.environ['DATABASE_URL']}\n")
+print(f"🗄  Database    : {LOCAL_DB}\n")
 
 import bcrypt as _bcrypt
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -43,12 +48,11 @@ from app.models.models import (
     TicketStatus, TicketPriority
 )
 
-# Build engine directly — no dependency on app config
-DB_URL = os.environ['DATABASE_URL']
+# Build engine with the local path
 engine = create_async_engine(
     DB_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DB_URL else {},
-    poolclass=StaticPool if "sqlite" in DB_URL else None,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
     echo=False,
 )
 Session = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
@@ -65,14 +69,14 @@ DEPTS = [
 ]
 
 USERS = [
-    ("admin@ticketiq.com",    "Admin@1234",    "Alex Morgan",    "admin",                 "EMP-0001","System Administrator",    None,        None),
-    ("ai.intern@ticketiq.com","Agent@1234",    "Priya Sharma",   "ai_intern",             "AGT-0001","AI Intern",               None,        "ai_intern"),
-    ("it.agent@ticketiq.com", "Agent@1234",    "James Okonkwo",  "it_support_technician", "AGT-0002","IT Support Technician",   None,        "it_support_technician"),
-    ("ops.agent@ticketiq.com","Agent@1234",    "Sofia Martinez", "junior_operations",     "AGT-0003","Junior Operations Agent", None,        "junior_operations"),
-    ("employee@ticketiq.com", "Employee@1234", "Jordan Lee",     "employee",              "EMP-0010","HR Coordinator",          "hr",        None),
-    ("sarah.k@ticketiq.com",  "Employee@1234", "Sarah Kim",      "employee",              "EMP-0011","Software Engineer",       "it",        None),
-    ("tom.w@ticketiq.com",    "Employee@1234", "Tom Williams",   "employee",              "EMP-0012","Finance Analyst",         "finance",   None),
-    ("nina.p@ticketiq.com",   "Employee@1234", "Nina Patel",     "employee",              "EMP-0013","Operations Coordinator",  "operations",None),
+    ("admin@ticketiq.com",    "Admin@1234",    "Pamela Sibiya",           "admin",                 "EMP-0001","System Administrator",     None,        None),
+    ("ai.intern@ticketiq.com","Agent@1234",    "Lehlogonolo Ledwaba",     "ai_intern",             "AGT-0001","AI Intern",                None,        "ai_intern"),
+    ("it.agent@ticketiq.com", "Agent@1234",    "Lerato Selowa",           "it_support_technician", "AGT-0002","IT Support Technician",    None,        "it_support_technician"),
+    ("ops.agent@ticketiq.com","Agent@1234",    "Leslie Kekane",           "junior_operations",     "AGT-0003","Junior Automation Support", None,        "junior_operations"),
+    ("employee@ticketiq.com", "Employee@1234", "Murunwa Mudzhadzhi",      "employee",              "EMP-0010","HR Coordinator",           "hr",        None),
+    ("sarah.k@ticketiq.com",  "Employee@1234", "Mutshutshudzi Nemanashi", "employee",              "EMP-0011","Software Engineer",        "it",        None),
+    ("tom.w@ticketiq.com",    "Employee@1234", "Lerato Selowa",           "employee",              "EMP-0012","Finance Analyst",          "finance",   None),
+    ("nina.p@ticketiq.com",   "Employee@1234", "Murunwa Mudzhadzhi",      "employee",              "EMP-0013","Operations Coordinator",   "operations",None),
 ]
 
 TICKETS_DATA = [
@@ -114,14 +118,18 @@ async def seed():
                 dept_map[d["slug"]] = obj
                 print(f"  ✅ {d['name']}")
 
-        # Users
+        # Users — always update name and job_title so renames take effect
         print("\n── Users ────────────────────────────")
         user_map = {}
         for email, pw, name, role, eid, title, dept_slug, ark in USERS:
             ex = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
             if ex:
+                ex.full_name  = name
+                ex.job_title  = title
+                ex.employee_id = eid
+                if ark: ex.agent_role_key = ark
                 user_map[email] = ex
-                print(f"  ⏭  {email}")
+                print(f"  🔄 {name} ({role}) — updated")
             else:
                 dept_id = dept_map[dept_slug].id if dept_slug else None
                 obj = User(
@@ -135,7 +143,7 @@ async def seed():
                 db.add(obj)
                 await db.flush()
                 user_map[email] = obj
-                print(f"  ✅ {name} ({role})")
+                print(f"  ✅ {name} ({role}) — created")
 
         # Tickets
         print("\n── Tickets ──────────────────────────")
@@ -181,19 +189,19 @@ async def seed():
 
     print("\n🎉 Done!\n")
     print("─"*45)
-    print("Admin:   admin@ticketiq.com    | Admin@1234")
-    print("─"*45)
+    print("Admin:   admin@ticketiq.com    | Admin@1234  (Pamela Sibiya)")
+    print("─"*55)
     print("Employees  (password: Employee@1234)")
-    print("  employee@ticketiq.com   HR")
-    print("  sarah.k@ticketiq.com    IT")
-    print("  tom.w@ticketiq.com      Finance")
-    print("  nina.p@ticketiq.com     Operations")
-    print("─"*45)
+    print("  employee@ticketiq.com   Murunwa Mudzhadzhi      HR")
+    print("  sarah.k@ticketiq.com    Mutshutshudzi Nemanashi  IT")
+    print("  tom.w@ticketiq.com      Lerato Selowa           Finance")
+    print("  nina.p@ticketiq.com     Murunwa Mudzhadzhi      Operations")
+    print("─"*55)
     print("Agents  (password: Agent@1234)")
-    print("  ai.intern@ticketiq.com")
-    print("  it.agent@ticketiq.com")
-    print("  ops.agent@ticketiq.com")
-    print("─"*45)
+    print("  ai.intern@ticketiq.com  Lehlogonolo Ledwaba     AI Intern")
+    print("  it.agent@ticketiq.com   Lerato Selowa           IT Support")
+    print("  ops.agent@ticketiq.com  Leslie Kekane           Jr Automation Support")
+    print("─"*55)
 
 
 if __name__ == "__main__":

@@ -7,16 +7,16 @@ import { authApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/authStore'
 
 const EMPLOYEES = [
-  { label: 'HR Employee',      email: 'employee@ticketiq.com', pw: 'Employee@1234', dept: 'Human Resources'        },
-  { label: 'IT Employee',      email: 'sarah.k@ticketiq.com',  pw: 'Employee@1234', dept: 'Information Technology' },
-  { label: 'Finance Employee', email: 'tom.w@ticketiq.com',    pw: 'Employee@1234', dept: 'Finance'                },
-  { label: 'Ops Employee',     email: 'nina.p@ticketiq.com',   pw: 'Employee@1234', dept: 'Operations'             },
+  { label: 'Murunwa Mudzhadzhi',      email: 'employee@ticketiq.com', pw: 'Employee@1234', dept: 'Human Resources'        },
+  { label: 'Mutshutshudzi Nemanashi', email: 'sarah.k@ticketiq.com',  pw: 'Employee@1234', dept: 'Information Technology' },
+  { label: 'Lerato Selowa',           email: 'tom.w@ticketiq.com',    pw: 'Employee@1234', dept: 'Finance'                },
+  { label: 'Murunwa Mudzhadzhi',      email: 'nina.p@ticketiq.com',   pw: 'Employee@1234', dept: 'Operations'             },
 ]
 
 const AGENTS = [
-  { label: 'AI Intern',     email: 'ai.intern@ticketiq.com', pw: 'Agent@1234', handles: 'HR tickets'           },
-  { label: 'IT Support',    email: 'it.agent@ticketiq.com',  pw: 'Agent@1234', handles: 'IT · Finance tickets' },
-  { label: 'Jr Operations', email: 'ops.agent@ticketiq.com', pw: 'Agent@1234', handles: 'Operations tickets'   },
+  { label: 'Lehlogonolo Ledwaba', email: 'ai.intern@ticketiq.com', pw: 'Agent@1234', handles: 'Data · Reports · Analysis' },
+  { label: 'Lerato Selowa',       email: 'it.agent@ticketiq.com',  pw: 'Agent@1234', handles: 'IT · Hardware · Access'    },
+  { label: 'Leslie Kekane',       email: 'ops.agent@ticketiq.com', pw: 'Agent@1234', handles: 'Workflows · Automation'    },
 ]
 
 export default function LoginPage() {
@@ -185,7 +185,7 @@ export default function LoginPage() {
               <p className="section-label">Support Agents</p>
             </div>
             <p className="text-xs mb-3" style={{ color: 'var(--text-3)' }}>
-              AI reads each ticket and assigns it to the agent role best equipped to solve it.
+              AI reads each ticket and assigns it to the agent whose expertise matches — IT/access issues go to IT Support, data/reporting requests to AI Intern, and automation/workflow problems to Jr Automation Support. All agents can receive tickets from any department.
             </p>
             <div className="grid grid-cols-3 gap-2">
               {AGENTS.map(acc => (

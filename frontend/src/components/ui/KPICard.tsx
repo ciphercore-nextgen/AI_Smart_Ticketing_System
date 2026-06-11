@@ -1,52 +1,45 @@
 'use client'
-import { motion } from 'framer-motion'
 import { LucideIcon, TrendingUp, TrendingDown } from 'lucide-react'
-import clsx from 'clsx'
 
 interface KPICardProps {
-  title: string
-  value: string | number
-  icon: LucideIcon
-  trend?: number
-  color?: 'blue' | 'green' | 'red' | 'yellow' | 'purple' | 'cyan'
+  title:     string
+  value:     string | number
+  icon:      LucideIcon
+  trend?:    number
+  color?:    'blue' | 'green' | 'red' | 'yellow' | 'purple' | 'cyan'
   subtitle?: string
-  index?: number
+  index?:    number
 }
 
-const colorMap = {
-  blue:   { bg: 'bg-blue-500/10',   text: 'text-blue-400',   border: 'border-blue-500/20',   icon: 'text-blue-400' },
-  green:  { bg: 'bg-green-500/10',  text: 'text-green-400',  border: 'border-green-500/20',  icon: 'text-green-400' },
-  red:    { bg: 'bg-red-500/10',    text: 'text-red-400',    border: 'border-red-500/20',    icon: 'text-red-400' },
-  yellow: { bg: 'bg-yellow-500/10', text: 'text-yellow-400', border: 'border-yellow-500/20', icon: 'text-yellow-400' },
-  purple: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20', icon: 'text-purple-400' },
-  cyan:   { bg: 'bg-cyan-500/10',   text: 'text-cyan-400',   border: 'border-cyan-500/20',   icon: 'text-cyan-400' },
+const COLOR_MAP: Record<string, { color: string; bg: string; border: string }> = {
+  blue:   { color: '#60a5fa', bg: 'rgba(59,130,246,.1)',  border: 'rgba(59,130,246,.2)'  },
+  green:  { color: 'var(--success)',  bg: 'var(--success-bg)',  border: 'color-mix(in srgb, var(--success) 25%, transparent)'  },
+  red:    { color: 'var(--danger)',   bg: 'var(--danger-bg)',   border: 'color-mix(in srgb, var(--danger) 25%, transparent)'   },
+  yellow: { color: 'var(--warning)',  bg: 'var(--warning-bg)',  border: 'color-mix(in srgb, var(--warning) 25%, transparent)'  },
+  purple: { color: 'var(--accent-text)', bg: 'var(--accent-subtle)', border: 'color-mix(in srgb, var(--accent) 25%, transparent)' },
+  cyan:   { color: '#22d3ee', bg: 'rgba(6,182,212,.1)',   border: 'rgba(6,182,212,.2)'   },
 }
 
-export default function KPICard({ title, value, icon: Icon, trend, color = 'blue', subtitle, index = 0 }: KPICardProps) {
-  const c = colorMap[color]
+export default function KPICard({ title, value, icon: Icon, trend, color = 'blue', subtitle }: KPICardProps) {
+  const c = COLOR_MAP[color]
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.08 }}
-      className={clsx('glass-card rounded-xl p-5 border', c.border)}
-    >
+    <div className="card rounded-xl p-5" style={{ borderColor: c.border }}>
       <div className="flex items-start justify-between mb-3">
-        <div className={clsx('w-10 h-10 rounded-lg flex items-center justify-center', c.bg)}>
-          <Icon className={clsx('w-5 h-5', c.icon)} />
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: c.bg }}>
+          <Icon className="w-4.5 h-4.5" style={{ width: 18, height: 18, color: c.color }} />
         </div>
         {trend !== undefined && (
-          <div className={clsx('flex items-center gap-1 text-xs font-medium', trend >= 0 ? 'text-green-400' : 'text-red-400')}>
+          <div className="flex items-center gap-1 text-xs font-medium"
+            style={{ color: trend >= 0 ? 'var(--success)' : 'var(--danger)' }}>
             {trend >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
             {Math.abs(trend)}%
           </div>
         )}
       </div>
-      <div>
-        <p className={clsx('text-2xl font-bold', c.text)}>{value}</p>
-        <p className="text-sm text-gray-400 mt-0.5">{title}</p>
-        {subtitle && <p className="text-xs text-gray-600 mt-1">{subtitle}</p>}
-      </div>
-    </motion.div>
+      <p className="text-2xl font-bold" style={{ color: c.color }}>{value}</p>
+      <p className="text-sm mt-0.5" style={{ color: 'var(--text-3)' }}>{title}</p>
+      {subtitle && <p className="text-xs mt-1" style={{ color: 'var(--text-3)' }}>{subtitle}</p>}
+    </div>
   )
 }

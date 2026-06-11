@@ -30,8 +30,76 @@ app.include_router(notifications.router, prefix="/api/v1")
 @app.on_event("startup")
 async def startup():
     await init_db()
+    await _auto_seed()
     print("✅ TicketIQ Enterprise API started")
     print("📖 Docs: http://localhost:8000/api/v1/docs")
+
+
+async def _auto_seed():
+    """
+    Seed the database on first startup (or update existing users).
+    Safe to run every time — skips existing records, updates names.
+    """
+    import bcrypt
+    from sqlalchemy import select
+    from app.db.session import AsyncSessionLocal
+    from app.models.models import Department, User, UserRole
+
+    DEPTS = [
+        {"name": "Human Resources",        "slug": "hr",         "color": "#8B5CF6", "description": "Employee relations, benefits, policies", "is_active": True},
+        {"name": "Information Technology", "slug": "it",         "color": "#3B82F6", "description": "Hardware, software, network, access",    "is_active": True},
+        {"name": "Finance",                "slug": "finance",    "color": "#10B981", "description": "Expenses, payroll, invoices, budget",    "is_active": True},
+        {"name": "Operations",             "slug": "operations", "color": "#F59E0B", "description": "Facilities, logistics, procurement",     "is_active": True},
+    ]
+
+    USERS = [
+        ("admin@ticketiq.com",    "Admin@1234",    "Pamela Sibiya",           "admin",                 "EMP-0001", "System Administrator",     None,        None),
+        ("ai.intern@ticketiq.com","Agent@1234",    "Lehlogonolo Ledwaba",     "ai_intern",             "AGT-0001", "AI Intern",                None,        "ai_intern"),
+        ("it.agent@ticketiq.com", "Agent@1234",    "Lerato Selowa",           "it_support_technician", "AGT-0002", "IT Support Technician",    None,        "it_support_technician"),
+        ("ops.agent@ticketiq.com","Agent@1234",    "Leslie Kekane",           "junior_operations",     "AGT-0003", "Junior Automation Support", None,       "junior_operations"),
+        ("employee@ticketiq.com", "Employee@1234", "Murunwa Mudzhadzhi",      "employee",              "EMP-0010", "HR Coordinator",           "hr",        None),
+        ("sarah.k@ticketiq.com",  "Employee@1234", "Mutshutshudzi Nemanashi", "employee",              "EMP-0011", "Software Engineer",        "it",        None),
+        ("tom.w@ticketiq.com",    "Employee@1234", "Lerato Selowa",           "employee",              "EMP-0012", "Finance Analyst",          "finance",   None),
+        ("nina.p@ticketiq.com",   "Employee@1234", "Murunwa Mudzhadzhi",      "employee",              "EMP-0013", "Operations Coordinator",   "operations",None),
+    ]
+
+    def _hash(pw: str) -> str:
+        return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
+
+    import uuid
+    async with AsyncSessionLocal() as db:
+        # Departments
+        dept_map = {}
+        for d in DEPTS:
+            ex = (await db.execute(select(Department).where(Department.slug == d["slug"]))).scalar_one_or_none()
+            if not ex:
+                ex = Department(id=str(uuid.uuid4()), **d)
+                db.add(ex)
+                await db.flush()
+            dept_map[d["slug"]] = ex
+
+        # Users — create or update name/title
+        for email, pw, name, role, eid, title, dept_slug, ark in USERS:
+            ex = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+            if ex:
+                ex.full_name   = name
+                ex.job_title   = title
+                ex.employee_id = eid
+                if ark:
+                    ex.agent_role_key = ark
+            else:
+                dept_id = dept_map[dept_slug].id if dept_slug else None
+                db.add(User(
+                    id=str(uuid.uuid4()), email=email,
+                    hashed_password=_hash(pw), full_name=name,
+                    role=UserRole(role), employee_id=eid,
+                    job_title=title, department_id=dept_id,
+                    agent_role_key=ark, agent_departments=[],
+                    is_active=True,
+                ))
+
+        await db.commit()
+    print("🌱 Database seeded/updated")
 
 
 @app.get("/api/v1/health")
