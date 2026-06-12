@@ -53,14 +53,14 @@ async def _auto_seed():
     ]
 
     USERS = [
-        ("admin@ticketiq.com",    "Admin@1234",    "Pamela Sibiya",           "admin",                 "EMP-0001", "System Administrator",     None,        None),
-        ("ai.intern@ticketiq.com","Agent@1234",    "Lehlogonolo Ledwaba",     "ai_intern",             "AGT-0001", "AI Intern",                None,        "ai_intern"),
-        ("it.agent@ticketiq.com", "Agent@1234",    "Lerato Selowa",           "it_support_technician", "AGT-0002", "IT Support Technician",    None,        "it_support_technician"),
-        ("ops.agent@ticketiq.com","Agent@1234",    "Leslie Kekane",           "junior_operations",     "AGT-0003", "Junior Automation Support", None,       "junior_operations"),
-        ("employee@ticketiq.com", "Employee@1234", "Murunwa Mudzhadzhi",      "employee",              "EMP-0010", "HR Coordinator",           "hr",        None),
-        ("sarah.k@ticketiq.com",  "Employee@1234", "Mutshutshudzi Nemanashi", "employee",              "EMP-0011", "Software Engineer",        "it",        None),
-        ("tom.w@ticketiq.com",    "Employee@1234", "Lerato Selowa",           "employee",              "EMP-0012", "Finance Analyst",          "finance",   None),
-        ("nina.p@ticketiq.com",   "Employee@1234", "Murunwa Mudzhadzhi",      "employee",              "EMP-0013", "Operations Coordinator",   "operations",None),
+        ("p.sibiya@ticketiq.com",    "Admin@1234",    "Pamela Sibiya",           "admin",                 "EMP-0001", "System Administrator",     None,        None),
+        ("l.ledwaba@ticketiq.com","Agent@1234",    "Lehlogonolo Ledwaba",     "ai_intern",             "AGT-0001", "AI Intern",                None,        "ai_intern"),
+        ("l.selowa@ticketiq.com", "Agent@1234",    "Lerato Selowa",           "it_support_technician", "AGT-0002", "IT Support Technician",    None,        "it_support_technician"),
+        ("l.kekane@ticketiq.com","Agent@1234",    "Leslie Kekane",           "junior_operations",     "AGT-0003", "Junior Automation Support", None,       "junior_operations"),
+        ("m.mudzhadzhi@ticketiq.com", "Employee@1234", "Murunwa Mudzhadzhi",      "employee",              "EMP-0010", "HR Coordinator",           "hr",        None),
+        ("m.nemanashi@ticketiq.com",  "Employee@1234", "Mutshutshudzi Nemanashi", "employee",              "EMP-0011", "Software Engineer",        "it",        None),
+        ("l.selowa.fin@ticketiq.com",    "Employee@1234", "Lerato Selowa",           "employee",              "EMP-0012", "Finance Analyst",          "finance",   None),
+        ("m.mudzhadzhi.ops@ticketiq.com",   "Employee@1234", "Murunwa Mudzhadzhi",      "employee",              "EMP-0013", "Operations Coordinator",   "operations",None),
     ]
 
     def _hash(pw: str) -> str:

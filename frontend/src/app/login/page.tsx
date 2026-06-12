@@ -7,16 +7,16 @@ import { authApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/authStore'
 
 const EMPLOYEES = [
-  { label: 'Murunwa Mudzhadzhi',      email: 'employee@ticketiq.com', pw: 'Employee@1234', dept: 'Human Resources'        },
-  { label: 'Mutshutshudzi Nemanashi', email: 'sarah.k@ticketiq.com',  pw: 'Employee@1234', dept: 'Information Technology' },
-  { label: 'Lerato Selowa',           email: 'tom.w@ticketiq.com',    pw: 'Employee@1234', dept: 'Finance'                },
-  { label: 'Murunwa Mudzhadzhi',      email: 'nina.p@ticketiq.com',   pw: 'Employee@1234', dept: 'Operations'             },
+  { label: 'Murunwa Mudzhadzhi',      email: 'm.mudzhadzhi@ticketiq.com', pw: 'Employee@1234', dept: 'Human Resources'        },
+  { label: 'Mutshutshudzi Nemanashi', email: 'm.nemanashi@ticketiq.com',  pw: 'Employee@1234', dept: 'Information Technology' },
+  { label: 'Lerato Selowa',           email: 'l.selowa.fin@ticketiq.com',    pw: 'Employee@1234', dept: 'Finance'                },
+  { label: 'Murunwa Mudzhadzhi',      email: 'm.mudzhadzhi.ops@ticketiq.com',   pw: 'Employee@1234', dept: 'Operations'             },
 ]
 
 const AGENTS = [
-  { label: 'Lehlogonolo Ledwaba', email: 'ai.intern@ticketiq.com', pw: 'Agent@1234', handles: 'Data · Reports · Analysis' },
-  { label: 'Lerato Selowa',       email: 'it.agent@ticketiq.com',  pw: 'Agent@1234', handles: 'IT · Hardware · Access'    },
-  { label: 'Leslie Kekane',       email: 'ops.agent@ticketiq.com', pw: 'Agent@1234', handles: 'Workflows · Automation'    },
+  { label: 'Lehlogonolo Ledwaba', email: 'l.ledwaba@ticketiq.com', pw: 'Agent@1234', handles: 'Data · Reports · Analysis' },
+  { label: 'Lerato Selowa',       email: 'l.selowa@ticketiq.com',  pw: 'Agent@1234', handles: 'IT · Hardware · Access'    },
+  { label: 'Leslie Kekane',       email: 'l.kekane@ticketiq.com', pw: 'Agent@1234', handles: 'Workflows · Automation'    },
 ]
 
 export default function LoginPage() {
@@ -138,11 +138,11 @@ export default function LoginPage() {
           {/* Admin quick-access */}
           <div className="mt-5 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
             <p className="text-xs mb-1.5" style={{ color: 'var(--text-3)' }}>Quick admin access</p>
-            <button onClick={() => quickLogin('admin@ticketiq.com', 'Admin@1234')}
+            <button onClick={() => quickLogin('p.sibiya@ticketiq.com', 'Admin@1234')}
               className="flex items-center gap-2 text-xs font-medium transition"
               style={{ color: 'var(--accent)' }}>
               <Shield className="w-3 h-3" />
-              admin@ticketiq.com · Admin@1234
+              p.sibiya@ticketiq.com · Admin@1234
             </button>
           </div>
         </div>

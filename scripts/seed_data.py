@@ -69,30 +69,30 @@ DEPTS = [
 ]
 
 USERS = [
-    ("admin@ticketiq.com",    "Admin@1234",    "Pamela Sibiya",           "admin",                 "EMP-0001","System Administrator",     None,        None),
-    ("ai.intern@ticketiq.com","Agent@1234",    "Lehlogonolo Ledwaba",     "ai_intern",             "AGT-0001","AI Intern",                None,        "ai_intern"),
-    ("it.agent@ticketiq.com", "Agent@1234",    "Lerato Selowa",           "it_support_technician", "AGT-0002","IT Support Technician",    None,        "it_support_technician"),
-    ("ops.agent@ticketiq.com","Agent@1234",    "Leslie Kekane",           "junior_operations",     "AGT-0003","Junior Automation Support", None,        "junior_operations"),
-    ("employee@ticketiq.com", "Employee@1234", "Murunwa Mudzhadzhi",      "employee",              "EMP-0010","HR Coordinator",           "hr",        None),
-    ("sarah.k@ticketiq.com",  "Employee@1234", "Mutshutshudzi Nemanashi", "employee",              "EMP-0011","Software Engineer",        "it",        None),
-    ("tom.w@ticketiq.com",    "Employee@1234", "Lerato Selowa",           "employee",              "EMP-0012","Finance Analyst",          "finance",   None),
-    ("nina.p@ticketiq.com",   "Employee@1234", "Murunwa Mudzhadzhi",      "employee",              "EMP-0013","Operations Coordinator",   "operations",None),
+    ("p.sibiya@ticketiq.com",    "Admin@1234",    "Pamela Sibiya",           "admin",                 "EMP-0001","System Administrator",     None,        None),
+    ("l.ledwaba@ticketiq.com","Agent@1234",    "Lehlogonolo Ledwaba",     "ai_intern",             "AGT-0001","AI Intern",                None,        "ai_intern"),
+    ("l.selowa@ticketiq.com", "Agent@1234",    "Lerato Selowa",           "it_support_technician", "AGT-0002","IT Support Technician",    None,        "it_support_technician"),
+    ("l.kekane@ticketiq.com","Agent@1234",    "Leslie Kekane",           "junior_operations",     "AGT-0003","Junior Automation Support", None,        "junior_operations"),
+    ("m.mudzhadzhi@ticketiq.com", "Employee@1234", "Murunwa Mudzhadzhi",      "employee",              "EMP-0010","HR Coordinator",           "hr",        None),
+    ("m.nemanashi@ticketiq.com",  "Employee@1234", "Mutshutshudzi Nemanashi", "employee",              "EMP-0011","Software Engineer",        "it",        None),
+    ("l.selowa.fin@ticketiq.com",    "Employee@1234", "Lerato Selowa",           "employee",              "EMP-0012","Finance Analyst",          "finance",   None),
+    ("m.mudzhadzhi.ops@ticketiq.com",   "Employee@1234", "Murunwa Mudzhadzhi",      "employee",              "EMP-0013","Operations Coordinator",   "operations",None),
 ]
 
 TICKETS_DATA = [
     # (title, desc, submitter_email, dept_slug, agent_email, status, priority)
-    ("Annual Leave Request — 3 Days",        "I'd like 3 days leave March 20-22. I have 8 remaining days.",               "employee@ticketiq.com","hr",        "ai.intern@ticketiq.com", "assigned",    "low"),
-    ("February Payslip Missing from Portal", "My Feb payslip is missing in the HR portal. All others are visible.",        "employee@ticketiq.com","hr",        "ai.intern@ticketiq.com", "in_progress", "high"),
-    ("Maternity Leave Policy Clarification", "Need clarity on maternity leave duration, pay, and return-to-work.",         "employee@ticketiq.com","hr",        "ai.intern@ticketiq.com", "open",        "medium"),
-    ("VPN Not Connecting After Windows Update","VPN Error 442 since yesterday's update. Cannot work remotely at all.",     "sarah.k@ticketiq.com", "it",        "it.agent@ticketiq.com",  "in_progress", "critical"),
-    ("Laptop Running Extremely Slow",         "Dell XPS 13 very slow this week. Apps take 30+ seconds. Storage at 95%.",   "sarah.k@ticketiq.com", "it",        "it.agent@ticketiq.com",  "assigned",    "medium"),
-    ("New Hire Software Setup — David Chen",  "New hire starts Monday. Needs Office 365, Slack, Figma, GitHub access.",    "sarah.k@ticketiq.com", "it",        "it.agent@ticketiq.com",  "open",        "high"),
-    ("Expense Claim Rejected Without Reason", "My £240 client dinner claim (EXP-2024-0892) rejected. Receipts attached.",  "tom.w@ticketiq.com",   "finance",   "it.agent@ticketiq.com",  "escalated",   "high"),
-    ("Q1 Budget Report Not Generated",        "Automated Q1 budget report missing. Dashboard error. Board meeting Monday.","tom.w@ticketiq.com",   "finance",   "it.agent@ticketiq.com",  "in_progress", "critical"),
-    ("Purchase Order Approval Needed",        "PO-2024-0445 for monitors and docking stations £3,200. Budget: IT-CAPEX.",  "tom.w@ticketiq.com",   "finance",   "it.agent@ticketiq.com",  "open",        "medium"),
-    ("Office Chair Broken — Urgent",          "Hydraulic mechanism broken. Sinks to lowest position. Need replacement.",   "nina.p@ticketiq.com",  "operations","ops.agent@ticketiq.com", "assigned",    "medium"),
-    ("Meeting Room 3A Projector Faulty",      "HDMI port loose on 3A projector. Client presentation Friday — urgent.",     "nina.p@ticketiq.com",  "operations","ops.agent@ticketiq.com", "in_progress", "high"),
-    ("Building Access Card Not Working",      "Access card stopped working at server room. Needs re-programming.",         "nina.p@ticketiq.com",  "operations","ops.agent@ticketiq.com", "resolved",    "high"),
+    ("Annual Leave Request — 3 Days",        "I'd like 3 days leave March 20-22. I have 8 remaining days.",               "m.mudzhadzhi@ticketiq.com","hr",        "l.ledwaba@ticketiq.com", "assigned",    "low"),
+    ("February Payslip Missing from Portal", "My Feb payslip is missing in the HR portal. All others are visible.",        "m.mudzhadzhi@ticketiq.com","hr",        "l.ledwaba@ticketiq.com", "in_progress", "high"),
+    ("Maternity Leave Policy Clarification", "Need clarity on maternity leave duration, pay, and return-to-work.",         "m.mudzhadzhi@ticketiq.com","hr",        "l.ledwaba@ticketiq.com", "open",        "medium"),
+    ("VPN Not Connecting After Windows Update","VPN Error 442 since yesterday's update. Cannot work remotely at all.",     "m.nemanashi@ticketiq.com", "it",        "l.selowa@ticketiq.com",  "in_progress", "critical"),
+    ("Laptop Running Extremely Slow",         "Dell XPS 13 very slow this week. Apps take 30+ seconds. Storage at 95%.",   "m.nemanashi@ticketiq.com", "it",        "l.selowa@ticketiq.com",  "assigned",    "medium"),
+    ("New Hire Software Setup — Sipho Dlamini",  "New hire starts Monday. Needs Office 365, Slack, Figma, GitHub access.",    "m.nemanashi@ticketiq.com", "it",        "l.selowa@ticketiq.com",  "open",        "high"),
+    ("Expense Claim Rejected Without Reason", "My £240 client dinner claim (EXP-2024-0892) rejected. Receipts attached.",  "l.selowa.fin@ticketiq.com",   "finance",   "l.selowa@ticketiq.com",  "escalated",   "high"),
+    ("Q1 Budget Report Not Generated",        "Automated Q1 budget report missing. Dashboard error. Board meeting Monday.","l.selowa.fin@ticketiq.com",   "finance",   "l.selowa@ticketiq.com",  "in_progress", "critical"),
+    ("Purchase Order Approval Needed",        "PO-2024-0445 for monitors and docking stations £3,200. Budget: IT-CAPEX.",  "l.selowa.fin@ticketiq.com",   "finance",   "l.selowa@ticketiq.com",  "open",        "medium"),
+    ("Office Chair Broken — Urgent",          "Hydraulic mechanism broken. Sinks to lowest position. Need replacement.",   "m.mudzhadzhi.ops@ticketiq.com",  "operations","l.kekane@ticketiq.com", "assigned",    "medium"),
+    ("Meeting Room 3A Projector Faulty",      "HDMI port loose on 3A projector. Client presentation Friday — urgent.",     "m.mudzhadzhi.ops@ticketiq.com",  "operations","l.kekane@ticketiq.com", "in_progress", "high"),
+    ("Building Access Card Not Working",      "Access card stopped working at server room. Needs re-programming.",         "m.mudzhadzhi.ops@ticketiq.com",  "operations","l.kekane@ticketiq.com", "resolved",    "high"),
 ]
 
 
@@ -189,18 +189,18 @@ async def seed():
 
     print("\n🎉 Done!\n")
     print("─"*45)
-    print("Admin:   admin@ticketiq.com    | Admin@1234  (Pamela Sibiya)")
+    print("Admin:   p.sibiya@ticketiq.com    | Admin@1234  (Pamela Sibiya)")
     print("─"*55)
     print("Employees  (password: Employee@1234)")
-    print("  employee@ticketiq.com   Murunwa Mudzhadzhi      HR")
-    print("  sarah.k@ticketiq.com    Mutshutshudzi Nemanashi  IT")
-    print("  tom.w@ticketiq.com      Lerato Selowa           Finance")
-    print("  nina.p@ticketiq.com     Murunwa Mudzhadzhi      Operations")
+    print("  m.mudzhadzhi@ticketiq.com   Murunwa Mudzhadzhi      HR")
+    print("  m.nemanashi@ticketiq.com    Mutshutshudzi Nemanashi  IT")
+    print("  l.selowa.fin@ticketiq.com      Lerato Selowa           Finance")
+    print("  m.mudzhadzhi.ops@ticketiq.com     Murunwa Mudzhadzhi      Operations")
     print("─"*55)
     print("Agents  (password: Agent@1234)")
-    print("  ai.intern@ticketiq.com  Lehlogonolo Ledwaba     AI Intern")
-    print("  it.agent@ticketiq.com   Lerato Selowa           IT Support")
-    print("  ops.agent@ticketiq.com  Leslie Kekane           Jr Automation Support")
+    print("  l.ledwaba@ticketiq.com  Lehlogonolo Ledwaba     AI Intern")
+    print("  l.selowa@ticketiq.com   Lerato Selowa           IT Support")
+    print("  l.kekane@ticketiq.com  Leslie Kekane           Jr Automation Support")
     print("─"*55)
 
 
