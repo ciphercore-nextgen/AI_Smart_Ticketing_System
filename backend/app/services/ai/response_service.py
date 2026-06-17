@@ -305,33 +305,32 @@ def _match_template(category: str) -> str:
 
 SELF_HELP_SYSTEM_PROMPT = """You are TicketIQ's first-line resolution engine for enterprise employees.
 
-A support ticket was just submitted. Your goal is to ACTUALLY SOLVE the problem
-right now if you possibly can — not just hand out generic troubleshooting tips.
-Think like an experienced colleague sitting next to them who knows the answer.
+MOST IMPORTANT RULE: Your response must be 100% specific to the ticket provided.
+Read the TICKET TITLE and EMPLOYEE DESCRIPTION carefully. Every step, every sentence,
+every piece of advice must directly reference the actual problem this employee described.
+NEVER give a generic response. If two different tickets have different titles, your
+responses must be visibly different and tailored to each one.
+
+Your goal is to ACTUALLY SOLVE the problem right now — think like an experienced
+colleague sitting next to them who knows the exact answer.
 
 CORE PRINCIPLES:
-1. ATTEMPT A REAL ANSWER FIRST. If the ticket is a question you can answer directly
-   (e.g. "how many leave days do I get", "what's the WiFi password policy",
-   "how do I submit an expense claim", "what's the process for X") — answer it
-   in `likely_solution` using standard enterprise policy/knowledge. Be specific
-   and confident, but note it should be confirmed by the agent if it's a
-   binding policy/financial decision.
-2. FOR TECHNICAL ISSUES (VPN, password, laptop, printer, software, AI tools) —
-   give concrete fix steps that have a real chance of resolving it, in the
-   correct order (cheapest/safest/most-likely-to-work first).
-3. PREVENT THE PROBLEM FROM GETTING WORSE. Always include a `do_not_do` list —
-   specific actions the employee should AVOID while waiting (e.g. "don't submit
-   the form again — this can create duplicate records", "don't restart the
-   server", "don't uninstall the VPN client — reinstalling can lose saved configs").
-4. NEVER suggest "ask a colleague if they have the same issue" or "take a
-   screenshot for the agent" as a primary step — these don't solve anything.
-   A screenshot can be mentioned ONLY as a secondary note inside `escalate_if`,
-   never as a numbered step.
-5. Each step must be something that could plausibly FIX the issue, not just
-   gather information.
-6. Include an estimated time for each step e.g. "2 min"
-7. Keep each step under 25 words
-8. Add a "success_indicator" — how they'll know if it worked
+1. DIRECT ANSWER FIRST. If the ticket is a question ("how do I...", "what is...",
+   "can I...") — answer it directly in `likely_solution`. Use standard enterprise
+   policy knowledge. Be specific. Note if agent confirmation is needed for
+   binding/financial decisions.
+2. FOR TECHNICAL PROBLEMS — give numbered fix steps in order of: safest first,
+   most likely to work, least disruptive. Each step must name the specific thing
+   the employee mentioned (e.g. if they said "Outlook" say Outlook, not "email app").
+3. DO NOT DO list — specific things to avoid that could make THIS specific problem
+   worse. Not generic warnings — things directly relevant to what they described.
+4. FORBIDDEN STEPS — never include as a numbered step:
+   - "Ask a colleague if they have the same issue"
+   - "Take a screenshot"
+   - "Wait for the agent"
+   - "Contact IT" (they already did)
+   - Any step that only gathers info without attempting a fix
+5. Keep each instruction under 30 words. Include time estimate and success indicator.
 
 Respond ONLY with valid JSON:
 {
@@ -522,20 +521,23 @@ async def generate_self_help(
                     {
                         "role": "user",
                         "content": (
-                            f"Department: {department}\n"
-                            f"Category: {category}\n"
-                            f"Priority: {priority}\n"
-                            f"Title: {title}\n\n"
-                            f"Description:\n{description}"
+                            f"TICKET TITLE: {title}\n"
+                            f"EMPLOYEE DESCRIPTION: {description}\n\n"
+                            f"Context — Department: {department} | Category: {category} | Priority: {priority}\n\n"
+                            f"Using ONLY the specific problem described above (not a generic version of it), "
+                            f"generate self-help steps tailored exactly to what this employee said. "
+                            f"The steps must reference the actual problem: '{title}'. "
+                            f"Do not give generic steps that would apply to any ticket."
                         ),
                     },
                 ],
-                temperature=0.2,
-                max_tokens=800,
+                temperature=0.3,
+                max_tokens=1500,
                 response_format={"type": "json_object"},
             )
             result = json.loads(response.choices[0].message.content)
             result["generated_by"] = "groq"
+            result["enabled"] = True
             return result
         except Exception as e:
             print(f"[SelfHelp] GROQ failed: {e} — using fallback")
@@ -560,6 +562,7 @@ async def generate_self_help(
 
     tpl = SELF_HELP_FALLBACK[key]
     return {
+        "enabled":          True,
         "can_self_resolve": key != "general",
         "confidence":       0.70,
         "summary":          tpl["summary"],

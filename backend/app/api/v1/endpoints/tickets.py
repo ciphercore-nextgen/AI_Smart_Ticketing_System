@@ -63,6 +63,7 @@ def _ticket_to_dict(t: Ticket) -> dict:
         "assigned_agent": {
             "id":             t.assigned_agent.id,
             "full_name":      t.assigned_agent.full_name,
+            "job_title":      t.assigned_agent.job_title,
             "agent_role_key": t.assigned_agent.agent_role_key,
         } if t.assigned_agent else None,
         # Full AI routing intelligence exposed to the frontend

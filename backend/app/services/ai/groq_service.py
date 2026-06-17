@@ -92,30 +92,39 @@ RESOLVING AGENTS and their scopes:
 
 CRITICAL DISAMBIGUATION RULES — apply before assigning tokens:
 
-THE "AI" KEYWORD TEST — apply this FIRST, before any other rule:
-If the ticket mentions AI, an AI tool, AI chatbot, Copilot, ChatGPT, AI assistant,
-or any AI-branded product — in ANY context (using it, it's broken, it's slow,
-access issues, errors, anything) — it goes to ai_intern. No exceptions, no
-further disambiguation needed. The AI Intern owns the full lifecycle of AI
-tooling at this company: usage help AND technical issues with that tooling.
-  - "Help me use AI to research this" → ai_intern
-  - "The AI chatbot is not responding" → ai_intern
-  - "Copilot keeps crashing" → ai_intern
-  - "Can't log into the AI tool" → ai_intern
-  - "AI assistant is giving wrong answers" → ai_intern
-Only if NOTHING in the ticket references AI/chatbot/Copilot/etc. do the
-following rules apply.
+STEP 1 — AI TOOLING CHECK (check this first, only if ticket explicitly names an AI product):
+Only route to ai_intern if the ticket contains one of these EXACT phrases or named products:
+  "AI chatbot", "AI tool", "AI assistant", "AI chat", "Copilot", "ChatGPT", "GPT",
+  "OpenAI", "LLM", "AI bot", "artificial intelligence", "the AI", "our AI".
+  Examples that qualify:
+    - "The AI chatbot is not responding" → ai_intern
+    - "Copilot keeps crashing" → ai_intern
+    - "Help me use AI to generate a report" → ai_intern
+    - "Can't access the AI tool" → ai_intern
+  Examples that do NOT qualify (no explicit AI product mentioned):
+    - "My PC froze" → it_support_technician (PC is a device, not an AI tool)
+    - "My computer crashed" → it_support_technician
+    - "Software not loading" → it_support_technician
+    - "I can't access my account" → it_support_technician (access = login issue)
+    - "System is slow" → it_support_technician
 
-WORKFLOW/AUTOMATION TICKETS (non-AI):
-- "automation" routes to junior_operations ONLY when a named BUSINESS WORKFLOW or
-  SCHEDULED JOB is broken (e.g. "leave approval flow stopped", "cron job failed").
-- Generic "something isn't working" or "it's not responding" without naming a workflow
-  → it_support_technician.
+STEP 2 — DEVICE / HARDWARE / SOFTWARE TICKETS (no AI product mentioned):
+Any ticket about a physical device, non-AI software, or IT access:
+  "PC", "computer", "laptop", "freezing", "crashed", "slow", "won't start",
+  "blue screen", "printer", "VPN", "password", "email", "Outlook", "Teams",
+  "software install", "account locked", "can't login", "screen", "keyboard",
+  "mouse", "monitor", "WiFi", "network", "storage", "hard drive"
+  → it_support_technician. Always. Even if the word "AI" appears elsewhere
+  in the company name or unrelated context.
 
-BROKEN APP/SOFTWARE TICKETS (non-AI):
-- "not responding", "not loading", "crashed", "can't open", "keeps freezing"
-  → it_support_technician UNLESS a specific named workflow/scheduled job is mentioned,
-  OR the app is an AI tool (see AI KEYWORD TEST above, which takes priority).
+STEP 3 — WORKFLOW / AUTOMATION TICKETS (no AI product mentioned):
+Route to junior_operations ONLY when a named BUSINESS WORKFLOW or SCHEDULED JOB
+is broken: "leave approval flow", "cron job failed", "Power Automate", "scheduled task",
+"onboarding workflow", "integration not triggering". Generic "it stopped working"
+without naming a workflow → it_support_technician.
+
+STEP 4 — DATA / REPORTING (no AI product, no device, no workflow):
+Requests for analysis, reports, dashboards, summaries → ai_intern.
 
 PRIORITY RULES:
 CRITICAL (4hr SLA): system/server down, data breach, security incident, payroll not processed,
@@ -164,29 +173,42 @@ Junior Automation Support: handles workflow and automation failures —
   NOT passwords, NOT data analysis, NOT hardware, NOT broken apps or software,
   NOT AI tooling (even "AI automation" issues go to AI Intern — see below).
 
-THE GOLDEN RULE — apply BEFORE anything else:
-Does the ticket mention AI, an AI tool, AI chatbot, AI assistant, Copilot,
-ChatGPT, or any AI-branded product, in ANY context? → AI Intern. Full stop.
-This applies whether the employee wants help USING it or is reporting it's
-BROKEN/SLOW/ERRORING/DOWN. Real companies route all tickets about a specific
-tool to the team that owns that tool — the AI Intern owns AI tooling here.
+ROUTING DECISION TREE — follow these steps in order:
 
-ROUTING EXAMPLES — use these to calibrate:
-- "Password reset / can't login / VPN down / laptop broken" → IT Support Assistant
-- "Generate a report / analyse data / summarise document / create dashboard" → AI Intern
-- "I need help using AI to research our sales trends" → AI Intern
-- "The AI chatbot is not responding / Copilot keeps crashing / can't access the AI tool" → AI Intern (AI tooling — owned end-to-end by AI Intern)
-- "The leave approval workflow stopped / scheduled job failed / automation not triggering" → Junior Automation Support
-- "The AI-powered automation isn't triggering" → AI Intern (AI keyword wins — they'll loop in automation support internally if needed)
-- "HR submitted a ticket about a password reset" → IT Support Assistant (content, not dept)
-- "Finance submitted a ticket about a trend report" → AI Intern (content, not dept)
-- "IT submitted a ticket about a workflow failure" → Junior Automation Support (content, not dept)
-- "IT submitted a ticket saying the AI chatbot is down" → AI Intern (content mentions AI — overrides submitting dept AND the "sounds like IT" instinct)
+STEP 1: Does the ticket explicitly name an AI product?
+  ("AI chatbot", "AI tool", "AI assistant", "Copilot", "ChatGPT", "GPT", "our AI", "the AI")
+  YES → AI Intern (they own AI tooling end-to-end: usage help AND technical issues)
+  NO  → continue to Step 2
 
-STRICT RULE: "not responding / not working / crashed / not loading" WITHOUT any
-mention of AI/chatbot/Copilot and WITHOUT a named workflow → IT Support Assistant.
-If AI/chatbot/Copilot IS mentioned, it always goes to AI Intern regardless of
-the "not responding" phrasing.
+STEP 2: Is it about a physical device, non-AI software, or IT access?
+  (PC, computer, laptop, phone, printer, freezing, crash, slow, VPN, password,
+   email, Outlook, Teams, account locked, can't login, WiFi, screen, keyboard,
+   storage, network, software install, hardware)
+  YES → IT Support Assistant
+  NO  → continue to Step 3
+
+STEP 3: Is it about a named business workflow, scheduled job, or automation pipeline?
+  (leave approval flow, cron job, Power Automate flow, onboarding workflow,
+   scheduled task, integration not triggering, approval emails not sending)
+  YES → Junior Automation Support
+  NO  → continue to Step 4
+
+STEP 4: Is it a data/reporting/analysis request?
+  (generate a report, analyse data, dashboard, summarise, research, trends, FAQ)
+  YES → AI Intern
+  NO  → IT Support Assistant (default for anything unclassified)
+
+CONCRETE EXAMPLES:
+✓ "My PC froze" → IT Support Assistant (PC = device, Step 2)
+✓ "My computer crashed" → IT Support Assistant (computer = device, Step 2)
+✓ "VPN not connecting" → IT Support Assistant (VPN = IT access, Step 2)
+✓ "I can't log in" → IT Support Assistant (login = IT access, Step 2)
+✓ "The AI chatbot is not responding" → AI Intern (names AI chatbot, Step 1)
+✓ "Copilot keeps crashing" → AI Intern (names Copilot, Step 1)
+✓ "Help me use AI to generate a report" → AI Intern (names AI, Step 1)
+✓ "Leave approval workflow stopped" → Junior Automation Support (named workflow, Step 3)
+✓ "Generate a sales report" → AI Intern (data request, Step 4)
+✓ "Software not loading" → IT Support Assistant (non-AI software, Step 2)
 
 Match ticket skill_tokens to agent scope strictly. Prefer the agent whose
 PRIMARY expertise covers the core problem, not the submitting department.
@@ -248,6 +270,8 @@ async def select_agent_for_ticket(
     ticket_tokens: list[str],
     token_weights: dict[str, int],
     agents: list[dict],
+    ticket_title: str = "",
+    ticket_description: str = "",
 ) -> dict:
     if not agents:
         return {"selected_agent_id": None, "routing_rationale": "No agents available", "selection_confidence": 0}
@@ -256,12 +280,14 @@ async def select_agent_for_ticket(
     best_by_tokens = max(python_scores, key=lambda x: x["score"])
 
     if not settings.GROQ_API_KEY or settings.GROQ_API_KEY.startswith("gsk_your"):
+        token_id = best_by_tokens["agent_id"]
+        override = _deterministic_override(ticket_title, ticket_description, token_id, agents)
         return {
-            "selected_agent_id":    best_by_tokens["agent_id"],
+            "selected_agent_id":    override or token_id,
             "routing_rationale":    best_by_tokens["rationale"],
             "selection_confidence": min(best_by_tokens["score"] / 30.0, 0.95),
             "token_match_score":    best_by_tokens["score"],
-            "selected_by":          "token_scoring",
+            "selected_by":          "deterministic_override" if override else "token_scoring",
         }
 
     try:
@@ -310,16 +336,25 @@ async def select_agent_for_ticket(
 
         result["selected_agent_id"] = selected_id
         result["selected_by"] = "groq_agent_selection"
+
+        # Final sanity check — override if clearly wrong
+        override = _deterministic_override(ticket_title, ticket_description, selected_id, agents)
+        if override:
+            result["selected_agent_id"] = override
+            result["selected_by"] = "deterministic_override"
+            result["routing_rationale"] += " [Override: keyword match corrected routing]"
         return result
 
     except Exception as e:
         print(f"[GROQ Stage2] Agent selection failed: {e}, using token fallback")
+        fallback_id = best_by_tokens["agent_id"]
+        override = _deterministic_override(ticket_title, ticket_description, fallback_id, agents)
         return {
-            "selected_agent_id":    best_by_tokens["agent_id"],
+            "selected_agent_id":    override or fallback_id,
             "routing_rationale":    best_by_tokens["rationale"],
             "selection_confidence": min(best_by_tokens["score"] / 30.0, 0.95),
             "token_match_score":    best_by_tokens["score"],
-            "selected_by":          "token_scoring_fallback",
+            "selected_by":          "deterministic_override" if override else "token_scoring_fallback",
         }
 
 
@@ -361,6 +396,99 @@ def _score_agents_by_tokens(
         })
 
     return sorted(results, key=lambda x: x["score"], reverse=True)
+
+
+# ─── Deterministic Routing Override ──────────────────────────────────────────
+# This runs AFTER both GROQ stages as a final sanity check.
+# It prevents the AI from misrouting tickets that have clear keyword signals.
+# Rules here are hard — they override GROQ when the answer is unambiguous.
+
+_IT_HARD_SIGNALS = [
+    "pc", "computer", "laptop", "desktop", "monitor", "keyboard", "mouse",
+    "printer", "scanner", "screen", "hard drive", "ssd", "ram", "cpu",
+    "frozen", "froze", "freezing", "blue screen", "bsod", "won't start",
+    "won't boot", "black screen", "password", "locked out", "vpn",
+    "wifi", "wi-fi", "internet", "network", "ethernet", "outlook",
+    "microsoft teams", "teams ", "sharepoint", "onedrive", "microsoft 365",
+    "m365", "office 365", "software install", "can't install",
+    "device", "phone", "mobile", "tablet", "headset", "webcam",
+    "slow computer", "slow laptop", "slow pc", "computer crash",
+    "laptop crash", "pc crash", "system crash",
+]
+
+_AI_TOOL_HARD_SIGNALS = [
+    "ai chatbot", "ai tool", "ai assistant", "ai chat", "copilot",
+    "chatgpt", "openai", "the ai ", " ai ", "our ai", "ai bot", "llm",
+    "artificial intelligence",
+]
+
+_AUTOMATION_HARD_SIGNALS = [
+    "workflow", "approval flow", "cron job", "scheduled job", "scheduled task",
+    "power automate", "zapier", "make.com", "integration not", "not triggering",
+    "leave workflow", "onboarding workflow", "offboarding workflow",
+    "erp workflow", "provisioning workflow",
+]
+
+_DATA_HARD_SIGNALS = [
+    "generate a report", "create a report", "data analysis", "analyse our",
+    "analyze our", "create a dashboard", "build a dashboard",
+    "summarise these", "summarize these", "trend analysis", "generate insights",
+    "employee turnover report", "survey results",
+]
+
+
+def _deterministic_override(
+    title: str,
+    description: str,
+    selected_agent_id: str,
+    agents: list[dict],
+) -> str | None:
+    """
+    Returns a corrected agent_id if the selection is clearly wrong,
+    otherwise returns None (keep original selection).
+    Uses exact keyword matching — no AI involved.
+    """
+    text = (title + " " + description).lower()
+
+    def _find_agent_by_role(role_key: str) -> str | None:
+        for a in agents:
+            if a.get("agent_role_key") == role_key:
+                return a["id"]
+        return None
+
+    # AI tool signals take priority — check first
+    if any(sig in text for sig in _AI_TOOL_HARD_SIGNALS):
+        correct = _find_agent_by_role("ai_intern")
+        if correct and correct != selected_agent_id:
+            print(f"[OVERRIDE] AI tool signal detected → forcing ai_intern")
+            return correct
+        return None  # already correct
+
+    # Hard IT signals — these MUST go to IT Support
+    if any(sig in text for sig in _IT_HARD_SIGNALS):
+        correct = _find_agent_by_role("it_support_technician")
+        if correct and correct != selected_agent_id:
+            print(f"[OVERRIDE] IT hardware/device signal → forcing it_support_technician")
+            return correct
+        return None
+
+    # Hard automation signals — must go to junior_operations
+    if any(sig in text for sig in _AUTOMATION_HARD_SIGNALS):
+        correct = _find_agent_by_role("junior_operations")
+        if correct and correct != selected_agent_id:
+            print(f"[OVERRIDE] Automation/workflow signal → forcing junior_operations")
+            return correct
+        return None
+
+    # Hard data/reporting signals — must go to ai_intern
+    if any(sig in text for sig in _DATA_HARD_SIGNALS):
+        correct = _find_agent_by_role("ai_intern")
+        if correct and correct != selected_agent_id:
+            print(f"[OVERRIDE] Data/reporting signal → forcing ai_intern")
+            return correct
+        return None
+
+    return None  # no override needed
 
 
 # ─── AI Reply Generation ──────────────────────────────────────────────────────

@@ -144,19 +144,19 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                   {/* Summary + confidence */}
                   <div className="flex items-start gap-3">
                     <div className="flex-1">
-                      <p className="text-sm text-gray-300 leading-relaxed">{data.summary}</p>
+                      <p className="text-sm text-gray-300 leading-relaxed">{data.summary ?? ""}</p>
                       <div className="flex items-center gap-3 mt-2">
                         <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          data.can_self_resolve
+                          (data.can_self_resolve ?? false)
                             ? 'bg-green-500/10 text-green-400'
                             : 'bg-gray-700 text-gray-400'
                         }`}>
-                          {data.can_self_resolve ? '✓ May self-resolve' : 'Agent required'}
+                          {(data.can_self_resolve ?? false) ? '✓ May self-resolve' : 'Agent required'}
                         </span>
                         <span className="text-xs text-gray-600">
-                          {Math.round(data.confidence * 100)}% confidence
+                          {Math.round((data.confidence ?? 0) * 100)}% confidence
                         </span>
-                        {data.generated_by === 'groq' && (
+                        {(data.generated_by ?? '') === 'groq' && (
                           <span className="text-xs text-blue-400/60 flex items-center gap-1">
                             <Zap className="w-2.5 h-2.5" /> AI generated
                           </span>

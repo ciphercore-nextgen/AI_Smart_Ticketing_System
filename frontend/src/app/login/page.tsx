@@ -14,9 +14,9 @@ const EMPLOYEES = [
 ]
 
 const AGENTS = [
-  { label: 'Lehlogonolo Ledwaba', email: 'l.ledwaba@ticketiq.com', pw: 'Agent@1234', handles: 'Data · Reports · Analysis' },
-  { label: 'Lerato Selowa',       email: 'l.selowa@ticketiq.com',  pw: 'Agent@1234', handles: 'IT · Hardware · Access'    },
-  { label: 'Leslie Kekane',       email: 'l.kekane@ticketiq.com', pw: 'Agent@1234', handles: 'Workflows · Automation'    },
+  { label: 'Lehlogonolo Ledwaba', title: 'AI Intern',                 email: 'l.ledwaba@ticketiq.com', pw: 'Agent@1234', handles: 'Data · Reports · AI Tools' },
+  { label: 'Lerato Selowa',       title: 'IT Support Technician',      email: 'l.selowa@ticketiq.com',  pw: 'Agent@1234', handles: 'IT · Hardware · Access'    },
+  { label: 'Leslie Kekane',       title: 'Junior Automation Support',  email: 'l.kekane@ticketiq.com',  pw: 'Agent@1234', handles: 'Workflows · Automation'    },
 ]
 
 export default function LoginPage() {
@@ -196,6 +196,7 @@ export default function LoginPage() {
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-subtle)'}
                 >
                   <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{acc.label}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--accent-text)', lineHeight: '1.3' }}>{acc.title}</p>
                   <p className="text-xs mt-1" style={{ color: 'var(--text-3)', lineHeight: '1.3' }}>{acc.handles}</p>
                 </button>
               ))}

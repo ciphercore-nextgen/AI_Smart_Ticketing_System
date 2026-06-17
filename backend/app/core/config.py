@@ -100,7 +100,7 @@ AGENT_SKILL_PROFILES = {
             # AI tooling issues — AI Intern owns the tool end-to-end, including outages
             "ai_tool", "ai_chatbot", "ai_assistant", "ai_tool_error", "ai_tool_down",
             "ai_tool_not_responding", "copilot", "chatbot_error", "ai_outage",
-            "ai_access", "ai_tool_crash", "ai_tool_slow", "ai_login_issue",
+            "ai_tool_crash", "ai_tool_slow",
         ],
         "expertise_summary": (
             "AI and data intern. Handles data analysis, report generation, dashboard assistance, "

@@ -82,7 +82,10 @@ async def create_ticket(
         })
 
     # ── AI Agent Selection ──────────────────────────────────────────────────
-    selection = await select_agent_for_ticket(skill_tokens, token_weights, agent_dicts)
+    selection = await select_agent_for_ticket(
+        skill_tokens, token_weights, agent_dicts,
+        ticket_title=title, ticket_description=description,
+    )
     selected_agent_id = selection.get("selected_agent_id")
 
     # Merge selection details into classification result

@@ -173,14 +173,19 @@ export default function TicketsPage() {
                       {/* Agent */}
                       <td>
                         {t.assigned_agent ? (
-                          <div className="flex items-center gap-1.5">
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
                               style={{ background: 'var(--accent-subtle)', color: 'var(--accent-text)' }}>
                               {t.assigned_agent.full_name?.charAt(0)}
                             </div>
-                            <span className="text-xs" style={{ color: 'var(--text-2)' }}>
-                              {t.assigned_agent.full_name?.split(' ')[0]}
-                            </span>
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium truncate" style={{ color: 'var(--text-2)', maxWidth: 130 }}>
+                                {t.assigned_agent.full_name}
+                              </p>
+                              <p className="text-xs truncate" style={{ color: 'var(--text-3)', fontSize: 11, maxWidth: 130 }}>
+                                {t.assigned_agent.job_title || t.assigned_agent.agent_role_key?.replace(/_/g, ' ')}
+                              </p>
+                            </div>
                           </div>
                         ) : (
                           <span className="text-xs" style={{ color: 'var(--text-3)' }}>Unassigned</span>
