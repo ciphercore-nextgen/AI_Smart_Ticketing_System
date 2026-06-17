@@ -21,6 +21,7 @@ export default function SettingsPage() {
   const [selfHelp,    setSelfHelp]    = useState(true)
   const [toneDefault, setToneDefault] = useState('formal')
   const [slaHrs,      setSlaHrs]      = useState({ critical: 4, high: 24, medium: 72, low: 168 })
+  const [saving,      setSaving]      = useState(false)
 
   // Real-time clock
   useEffect(() => {
@@ -35,10 +36,36 @@ export default function SettingsPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  const save = () => {
-    setSaved(true)
-    toast.success('Settings saved')
-    setTimeout(() => setSaved(false), 2000)
+  useEffect(() => {
+    adminApi.getSettings()
+      .then(({ data }) => {
+        if (data.groq_model)   setGroqModel(data.groq_model)
+        if (typeof data.auto_reply === 'boolean') setAutoReply(data.auto_reply)
+        if (typeof data.self_help === 'boolean')  setSelfHelp(data.self_help)
+        if (data.tone_default) setToneDefault(data.tone_default)
+        if (data.sla_hours)    setSlaHrs(data.sla_hours)
+      })
+      .catch(console.error)
+  }, [])
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await adminApi.updateSettings({
+        groq_model:   groqModel,
+        auto_reply:   autoReply,
+        self_help:    selfHelp,
+        tone_default: toneDefault,
+        sla_hours:    slaHrs,
+      })
+      setSaved(true)
+      toast.success('Settings saved')
+      setTimeout(() => setSaved(false), 2000)
+    } catch {
+      toast.error('Failed to save settings')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const Row = ({ label, value, mono = false }: { label: string; value: any; mono?: boolean }) => (
@@ -202,8 +229,8 @@ export default function SettingsPage() {
         </Section>
 
         {/* Save */}
-        <button onClick={save} className="btn btn-primary" style={{ height: 40, paddingInline: 24 }}>
-          {saved ? <><CheckCircle className="w-4 h-4" /> Saved</> : 'Save Settings'}
+        <button onClick={save} disabled={saving} className="btn btn-primary" style={{ height: 40, paddingInline: 24, opacity: saving ? 0.6 : 1 }}>
+          {saved ? <><CheckCircle className="w-4 h-4" /> Saved</> : saving ? 'Saving...' : 'Save Settings'}
         </button>
 
       </div>

@@ -146,3 +146,48 @@ async def system_stats(
         "total_users":   total_users.scalar() or 0,
         "total_tickets": total_tickets.scalar() or 0,
     }
+
+
+# ─── System Settings (persisted to a small JSON file) ─────────────────────────
+import json
+from pathlib import Path
+
+SETTINGS_FILE = Path(__file__).resolve().parents[4] / "data" / "settings.json"
+
+DEFAULT_SETTINGS = {
+    "groq_model":   "llama3-8b-8192",
+    "auto_reply":   True,
+    "self_help":    True,
+    "tone_default": "formal",
+    "sla_hours":    {"critical": 4, "high": 24, "medium": 72, "low": 168},
+}
+
+
+def _read_settings() -> dict:
+    try:
+        if SETTINGS_FILE.exists():
+            data = json.loads(SETTINGS_FILE.read_text())
+            return {**DEFAULT_SETTINGS, **data}
+    except Exception as e:
+        print(f"[Settings] read failed: {e}")
+    return dict(DEFAULT_SETTINGS)
+
+
+def _write_settings(data: dict) -> dict:
+    merged = {**_read_settings(), **data}
+    try:
+        SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        SETTINGS_FILE.write_text(json.dumps(merged, indent=2))
+    except Exception as e:
+        print(f"[Settings] write failed: {e}")
+    return merged
+
+
+@router.get("/settings")
+async def get_settings(_: User = Depends(AdminOnly)):
+    return _read_settings()
+
+
+@router.put("/settings")
+async def update_settings(payload: dict, _: User = Depends(AdminOnly)):
+    return _write_settings(payload)

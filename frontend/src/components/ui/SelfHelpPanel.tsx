@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Lightbulb, ChevronDown, Clock, AlertTriangle,
-  CheckCircle, Circle, Zap, RefreshCw, ExternalLink
+  CheckCircle, Circle, Zap, RefreshCw, ExternalLink,
+  Sparkles, ShieldAlert
 } from 'lucide-react'
 import { ticketsApi } from '@/lib/api'
 
@@ -23,13 +24,16 @@ interface Step {
 }
 
 interface SelfHelpData {
-  can_self_resolve: boolean
-  confidence: number
-  summary: string
-  steps: Step[]
-  escalate_if: string
-  useful_links: { label: string; url: string | null }[]
-  generated_by: string
+  enabled?: boolean
+  can_self_resolve?: boolean
+  confidence?: number
+  summary?: string
+  likely_solution?: string | null
+  steps?: Step[]
+  do_not_do?: string[]
+  escalate_if?: string
+  useful_links?: { label: string; url: string | null }[]
+  generated_by?: string
 }
 
 interface Props {
@@ -127,7 +131,15 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                 </div>
               )}
 
-              {data && (
+              {/* Self-help disabled by admin */}
+              {data && data.enabled === false && (
+                <div className="py-4 text-center">
+                  <p className="text-sm text-gray-400">Self-help suggestions are currently turned off.</p>
+                  <p className="text-xs text-gray-600 mt-1">An agent will respond to your ticket shortly.</p>
+                </div>
+              )}
+
+              {data && data.enabled !== false && (
                 <>
                   {/* Summary + confidence */}
                   <div className="flex items-start gap-3">
@@ -160,6 +172,18 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                     </button>
                   </div>
 
+                  {/* Likely solution — direct answer attempt */}
+                  {data.likely_solution && (
+                    <div className="flex items-start gap-2 bg-blue-500/5 border border-blue-500/20 rounded-lg p-3">
+                      <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-medium text-blue-400">Possible answer</p>
+                        <p className="text-xs text-gray-300 mt-1 leading-relaxed">{data.likely_solution}</p>
+                        <p className="text-xs text-gray-600 mt-1.5">An agent will confirm this applies to your specific case.</p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Progress bar */}
                   {totalSteps > 0 && (
                     <div className="w-full bg-gray-800 rounded-full h-1">
@@ -172,7 +196,7 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
 
                   {/* Steps */}
                   <div className="space-y-2">
-                    {data.steps.map((step) => {
+                    {(data.steps ?? []).map((step) => {
                       const done    = checked.has(step.order)
                       const riskCfg = RISK_CONFIG[step.risk] || RISK_CONFIG.none
                       return (
@@ -233,6 +257,24 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                     })}
                   </div>
 
+                  {/* Do not do — prevent things from getting worse */}
+                  {data.do_not_do && data.do_not_do.length > 0 && (
+                    <div className="bg-orange-500/5 border border-orange-500/20 rounded-lg p-3">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <ShieldAlert className="w-3.5 h-3.5 text-orange-400" />
+                        <p className="text-xs font-medium text-orange-400">While you wait, avoid this</p>
+                      </div>
+                      <ul className="space-y-1">
+                        {data.do_not_do.map((item, i) => (
+                          <li key={i} className="text-xs text-gray-400 leading-relaxed pl-4 relative">
+                            <span className="absolute left-0 text-orange-400/60">·</span>
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   {/* Escalate warning */}
                   {data.escalate_if && (
                     <div className="flex items-start gap-2 bg-red-500/5 border border-red-500/20 rounded-lg p-3">
@@ -245,10 +287,10 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                   )}
 
                   {/* Useful links */}
-                  {data.useful_links?.filter(l => l.url).length > 0 && (
+                  {(data.useful_links?.filter(l => l.url).length ?? 0) > 0 && (
                     <div className="space-y-1">
                       <p className="text-xs text-gray-600">Useful resources</p>
-                      {data.useful_links.filter(l => l.url).map((link, i) => (
+                      {(data.useful_links ?? []).filter(l => l.url).map((link, i) => (
                         <a
                           key={i}
                           href={link.url!}

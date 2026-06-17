@@ -49,6 +49,8 @@ RESOLVING AGENTS and their scopes:
    Handles: password resets, account lockouts, email access, printer problems,
    VPN issues, software installation, laptop/desktop troubleshooting, Wi-Fi,
    user permissions, Microsoft 365, hardware, new employee device setup.
+   Does NOT own anything related to AI tools/chatbots — that is the AI Intern's
+   domain end-to-end (see below).
    Skill tokens: password, password_reset, account_lockout, login, authentication,
    2fa, mfa, account, access, permission, email, outlook, microsoft_365, teams,
    vpn, network, wifi, internet, connectivity, laptop, computer, hardware, device,
@@ -59,9 +61,14 @@ RESOLVING AGENTS and their scopes:
    Handles: data analysis, report generation, dashboard assistance, research,
    knowledge base creation, document summarization, trend analysis, FAQ generation,
    business intelligence, data cleaning, AI-powered insights.
-   Also handles requests where an employee needs AI ASSISTANCE for analysis,
-   research, or reporting — e.g. "help me use AI to analyse our data",
-   "I need an AI-generated summary", "can AI help me research this topic".
+   ALSO owns the company's AI tooling end-to-end — both USING it and FIXING it:
+     - "Help me use AI to analyse data / generate a report / summarise a document"
+     - "The AI chatbot / Copilot / AI assistant is not responding / not loading / broken / giving errors"
+     - "Can't access the AI tool", "AI chat keeps crashing", "AI assistant is down"
+   In a real company, the team that runs the AI tooling is the first point of
+   contact for ANY problem with that tooling — whether it's "how do I use this"
+   or "this isn't working". They triage: simple fixes get handled directly,
+   deeper infrastructure issues get escalated internally (still their ticket).
    Skill tokens: report, reporting, data_analysis, analysis, analytics, dashboard,
    trend_analysis, trends, insights, business_intelligence, data_cleaning,
    document_summary, summarize, faq, knowledge_base, research, documentation,
@@ -69,7 +76,9 @@ RESOLVING AGENTS and their scopes:
    support_trends, ticket_analytics, performance_report, financial_report,
    operational_report, hr_report, ai_insights, ai_assistance, ai_powered_analysis,
    ai_powered_report, ai_recommendation, ai_summary, content_generation,
-   text_analysis, sentiment_analysis, data_extraction, intelligent_search
+   text_analysis, sentiment_analysis, data_extraction, intelligent_search,
+   ai_tool, ai_chatbot, ai_assistant, ai_tool_error, ai_tool_down,
+   ai_tool_not_responding, copilot, chatbot_error, ai_outage, ai_access
 
 3. junior_operations
    Handles: workflow failures, process automation issues, scheduled job failures,
@@ -83,31 +92,30 @@ RESOLVING AGENTS and their scopes:
 
 CRITICAL DISAMBIGUATION RULES — apply before assigning tokens:
 
-AI-RELATED TICKETS — read carefully:
-- "Help me use AI to analyse data / generate a report / summarise a document / research a topic"
-  → ai_intern (they provide AI-powered data and reporting assistance)
-- "I need AI insights / AI-powered dashboard / AI recommendations on our data"
-  → ai_intern
-- "The AI chatbot/tool is not loading, not responding, crashing, won't open, can't access it"
-  → it_support_technician (broken software — user can't even get in, IT must fix the access)
-- "Copilot not working", "ChatGPT access blocked", "AI assistant giving errors"
-  → it_support_technician (IT access/software issue, not a data task)
-- "The AI automation / AI workflow is failing / not triggering"
-  → junior_operations (broken automated process)
+THE "AI" KEYWORD TEST — apply this FIRST, before any other rule:
+If the ticket mentions AI, an AI tool, AI chatbot, Copilot, ChatGPT, AI assistant,
+or any AI-branded product — in ANY context (using it, it's broken, it's slow,
+access issues, errors, anything) — it goes to ai_intern. No exceptions, no
+further disambiguation needed. The AI Intern owns the full lifecycle of AI
+tooling at this company: usage help AND technical issues with that tooling.
+  - "Help me use AI to research this" → ai_intern
+  - "The AI chatbot is not responding" → ai_intern
+  - "Copilot keeps crashing" → ai_intern
+  - "Can't log into the AI tool" → ai_intern
+  - "AI assistant is giving wrong answers" → ai_intern
+Only if NOTHING in the ticket references AI/chatbot/Copilot/etc. do the
+following rules apply.
 
-KEY TEST: Is the user asking someone to DO AI work for them (analysis, reports)?
-→ ai_intern. Is the user saying an AI tool/app is technically broken and they can't use it?
-→ it_support_technician.
-
-WORKFLOW/AUTOMATION TICKETS:
+WORKFLOW/AUTOMATION TICKETS (non-AI):
 - "automation" routes to junior_operations ONLY when a named BUSINESS WORKFLOW or
   SCHEDULED JOB is broken (e.g. "leave approval flow stopped", "cron job failed").
 - Generic "something isn't working" or "it's not responding" without naming a workflow
   → it_support_technician.
 
-BROKEN APP/SOFTWARE TICKETS:
+BROKEN APP/SOFTWARE TICKETS (non-AI):
 - "not responding", "not loading", "crashed", "can't open", "keeps freezing"
-  → it_support_technician UNLESS a specific named workflow or scheduled job is mentioned.
+  → it_support_technician UNLESS a specific named workflow/scheduled job is mentioned,
+  OR the app is an AI tool (see AI KEYWORD TEST above, which takes priority).
 
 PRIORITY RULES:
 CRITICAL (4hr SLA): system/server down, data breach, security incident, payroll not processed,
@@ -140,34 +148,45 @@ AGENT_SELECTION_PROMPT = """You are TicketIQ's agent assignment engine.
 
 STRICT ENTERPRISE RULES — agents have fixed scopes:
 
-IT Support Assistant: ONLY handles IT problems — passwords, devices, access,
+IT Support Assistant: handles IT problems — passwords, devices, access,
   hardware, software, email, VPN, printers, network. NOT data analysis, NOT HR.
+  Does NOT own AI tooling — see AI Intern below. If a ticket mentions any AI
+  tool/chatbot/Copilot/etc., it is NEVER assigned here, even if it "sounds IT".
 
-AI Intern: ONLY handles data/reporting/analysis work — reports, dashboards,
-  research, documentation, summaries, FAQs, trend analysis. NOT IT support, NOT HR policy.
+AI Intern: handles data/reporting/analysis work — reports, dashboards,
+  research, documentation, summaries, FAQs, trend analysis.
+  ALSO owns the company's AI tooling completely — both helping employees USE
+  AI tools AND fixing/triaging when those AI tools break or misbehave.
+  NOT general IT support, NOT HR policy, NOT non-AI software/hardware.
 
-Junior Automation Support: ONLY handles workflow and automation failures —
+Junior Automation Support: handles workflow and automation failures —
   broken workflows, failed scheduled jobs, integration errors, automation bugs.
-  NOT passwords, NOT data analysis, NOT hardware, NOT broken apps or software.
+  NOT passwords, NOT data analysis, NOT hardware, NOT broken apps or software,
+  NOT AI tooling (even "AI automation" issues go to AI Intern — see below).
+
+THE GOLDEN RULE — apply BEFORE anything else:
+Does the ticket mention AI, an AI tool, AI chatbot, AI assistant, Copilot,
+ChatGPT, or any AI-branded product, in ANY context? → AI Intern. Full stop.
+This applies whether the employee wants help USING it or is reporting it's
+BROKEN/SLOW/ERRORING/DOWN. Real companies route all tickets about a specific
+tool to the team that owns that tool — the AI Intern owns AI tooling here.
 
 ROUTING EXAMPLES — use these to calibrate:
 - "Password reset / can't login / VPN down / laptop broken" → IT Support Assistant
 - "Generate a report / analyse data / summarise document / create dashboard" → AI Intern
-- "I need help using AI to research our sales trends" → AI Intern (AI-powered analysis task)
-- "Copilot is not loading / AI chatbot app is broken / can't access the AI tool" → IT Support Assistant (broken app access)
+- "I need help using AI to research our sales trends" → AI Intern
+- "The AI chatbot is not responding / Copilot keeps crashing / can't access the AI tool" → AI Intern (AI tooling — owned end-to-end by AI Intern)
 - "The leave approval workflow stopped / scheduled job failed / automation not triggering" → Junior Automation Support
+- "The AI-powered automation isn't triggering" → AI Intern (AI keyword wins — they'll loop in automation support internally if needed)
 - "HR submitted a ticket about a password reset" → IT Support Assistant (content, not dept)
 - "Finance submitted a ticket about a trend report" → AI Intern (content, not dept)
 - "IT submitted a ticket about a workflow failure" → Junior Automation Support (content, not dept)
+- "IT submitted a ticket saying the AI chatbot is down" → AI Intern (content mentions AI — overrides submitting dept AND the "sounds like IT" instinct)
 
-DISAMBIGUATION FOR AI-RELATED TICKETS:
-Ask: is the user asking someone to DO AI work for them (analysis, reports, summaries)?
-→ ai_intern.
-Or is the user saying an AI tool/app is technically broken and they can't use it at all?
-→ it_support_technician.
-
-STRICT RULE: "not responding / not working / crashed / not loading" without a named
-workflow or scheduled job → IT Support Assistant, NOT Junior Automation Support.
+STRICT RULE: "not responding / not working / crashed / not loading" WITHOUT any
+mention of AI/chatbot/Copilot and WITHOUT a named workflow → IT Support Assistant.
+If AI/chatbot/Copilot IS mentioned, it always goes to AI Intern regardless of
+the "not responding" phrasing.
 
 Match ticket skill_tokens to agent scope strictly. Prefer the agent whose
 PRIMARY expertise covers the core problem, not the submitting department.
@@ -377,14 +396,31 @@ async def generate_ai_reply(
     agent_role: str = "it_support_technician",
 ) -> str:
     ROLE_LABEL = {
-        "ai_intern":             "AI Intern (Data & Reporting Analyst)",
+        "ai_intern":             "AI Intern (Data & Reporting Analyst / AI Tooling Owner)",
         "it_support_technician": "IT Support Assistant",
         "junior_operations":     "Junior Automation Support",
         "admin":                 "Support Manager",
     }.get(agent_role, "Support Agent")
 
+    # Detect if this is an AI-tool issue vs a data/reporting request
+    ai_tool_keywords = ["not responding", "not loading", "crashing", "can't access",
+                        "won't open", "error", "broken", "down", "slow", "login",
+                        "chatbot", "copilot", "ai tool", "ai assistant", "ai chat"]
+    is_ai_tool_issue = agent_role == "ai_intern" and any(
+        k in (title + " " + description).lower() for k in ai_tool_keywords
+    )
+
     fallback_by_role = {
-        "ai_intern":             f"I've received your request for \"{title}\". I'll begin the analysis and have the report/summary ready for you shortly — I'll update this ticket once it's complete.",
+        "ai_intern": (
+            f"I've picked up your ticket: \"{title}\". "
+            + ("I can see the AI tool is having issues — let me look into this now. "
+               "In the meantime, try clearing your browser cache and cookies, then refresh. "
+               "If the issue persists, try an incognito window or a different browser. "
+               "I'll check the service status and update you shortly."
+               if is_ai_tool_issue else
+               "I'll begin the analysis and have the report/summary ready for you shortly — "
+               "I'll update this ticket once it's complete.")
+        ),
         "it_support_technician": f"I've picked up your ticket regarding \"{title}\". Let me walk you through the steps to resolve this — please try the following and let me know the outcome.",
         "junior_operations":     f"I've logged your workflow issue: \"{title}\". Could you confirm the name of the workflow and when it last ran successfully? That will help me pinpoint the failure.",
     }.get(agent_role, f"Your ticket \"{title}\" has been received and I'm reviewing it now.")
@@ -446,6 +482,13 @@ def _extract_fallback_tokens(text: str) -> list[str]:
     Determines which AGENT scope fits, not which department submitted.
     """
     text_lower = text.lower()
+
+    # GOLDEN RULE: any mention of AI tooling → ai_intern, regardless of context.
+    # This must be checked FIRST, before IT/automation/generic-broken checks.
+    ai_signals = ["ai chatbot","ai tool","ai assistant","ai chat","copilot",
+                  "chatgpt","openai","gpt","llm","ai bot","artificial intelligence"]
+    if any(k in text_lower for k in ai_signals):
+        return ["ai_tool", "ai_chatbot", "ai_assistant"]
 
     # IT Support signals
     it_signals = ["password","reset","locked","vpn","wifi","network","laptop","printer",

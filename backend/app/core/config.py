@@ -44,6 +44,8 @@ AGENT_SKILL_PROFILES = {
     "it_support_technician": {
         "display_name": "IT Support Assistant",
         "color": "#3B82F6",
+        # NOTE: Does NOT own AI tooling (chatbots, Copilot, AI assistants) —
+        # that is the AI Intern's domain end-to-end, including when broken.
         "skill_tokens": [
             "password", "password_reset", "account_lockout", "login", "authentication",
             "2fa", "mfa", "account", "access", "permission", "user_account",
@@ -62,7 +64,9 @@ AGENT_SKILL_PROFILES = {
             "Entry-level IT support specialist. Handles password resets, account lockouts, "
             "email access, printer problems, VPN connectivity, software installation, "
             "laptop and desktop troubleshooting, Wi-Fi issues, user permissions, "
-            "Microsoft 365 support, basic hardware issues, and new employee device setup."
+            "Microsoft 365 support, basic hardware issues, and new employee device setup. "
+            "Does NOT handle AI tools, AI chatbots, or Copilot/ChatGPT-type issues — "
+            "those are owned by the AI Intern, even when reported as 'not responding'."
         ),
     },
 
@@ -93,13 +97,19 @@ AGENT_SKILL_PROFILES = {
             "generate_content", "content_generation", "text_analysis",
             "sentiment_analysis", "data_extraction", "pattern_recognition",
             "intelligent_search", "smart_search", "ai_query",
+            # AI tooling issues — AI Intern owns the tool end-to-end, including outages
+            "ai_tool", "ai_chatbot", "ai_assistant", "ai_tool_error", "ai_tool_down",
+            "ai_tool_not_responding", "copilot", "chatbot_error", "ai_outage",
+            "ai_access", "ai_tool_crash", "ai_tool_slow", "ai_login_issue",
         ],
         "expertise_summary": (
             "AI and data intern. Handles data analysis, report generation, dashboard assistance, "
             "research tasks, knowledge base creation, document summarization, trend analysis, "
             "data cleaning, AI-powered insights, FAQ generation, and business intelligence. "
-            "Also assists employees who need AI tools to help with analysis, research, or "
-            "content tasks. Does NOT fix broken software, reset passwords, or handle HR policy."
+            "Also owns the company's AI tooling (AI chatbot, Copilot-type assistants) "
+            "end-to-end — helping employees USE these tools AND triaging/fixing issues "
+            "when they're down, slow, erroring, or inaccessible. Does NOT fix non-AI "
+            "software/hardware, reset passwords for non-AI systems, or handle HR policy."
         ),
     },
 

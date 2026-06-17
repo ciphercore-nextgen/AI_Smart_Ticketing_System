@@ -100,6 +100,8 @@ export const adminApi = {
   updateUser:      (id: string, data: any)     => api.patch(`/admin/users/${id}`, data),
   listDepartments: ()                          => api.get('/admin/departments'),
   systemStats:     ()                          => api.get('/admin/system-stats'),
+  getSettings:     ()                          => api.get('/admin/settings'),
+  updateSettings:  (data: any)                 => api.put('/admin/settings', data),
 }
 
 // ─── Analytics ────────────────────────────────────────────────────────────────

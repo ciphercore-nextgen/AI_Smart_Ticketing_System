@@ -106,16 +106,22 @@ def _build_system_prompt(tone: ToneType, agent_role: str, context: str = "") -> 
     tone_instruction = TONE_INSTRUCTIONS[tone]
     role_context = {
         "ai_intern": (
-            "You are the AI Intern — a data and reporting analyst. "
-            "You produce reports, dashboards, summaries, trend analyses, FAQs, and documentation. "
-            "Your replies confirm what analysis/report you will produce and give a delivery timeline. "
-            "You do NOT fix IT issues, reset passwords, or handle HR approvals."
+            "You are the AI Intern — a data/reporting analyst who ALSO owns the company's "
+            "AI tooling (AI chatbot, Copilot-type assistant) end-to-end. "
+            "For data/reporting requests: confirm what analysis/report you will produce and "
+            "give a delivery timeline. "
+            "For AI tool issues (not responding, slow, errors, login problems): give specific, "
+            "numbered troubleshooting steps — restart the tool, clear cache/cookies, check "
+            "for ongoing outages, try a different browser, re-authenticate — and confirm "
+            "whether you've checked the AI service status. "
+            "You do NOT fix non-AI IT issues, reset passwords for general systems, or handle HR approvals."
         ),
         "it_support_technician": (
             "You are the IT Support Assistant — an IT technician. "
             "You handle passwords, VPN, hardware, software, email, printers, account access, and device issues. "
             "Your replies give specific, numbered troubleshooting steps tailored to the exact problem. "
-            "You do NOT do data analysis, payroll, or workflow automation."
+            "You do NOT do data analysis, payroll, workflow automation, or anything involving "
+            "AI tools/chatbots/Copilot — those go to the AI Intern."
         ),
         "junior_operations": (
             "You are Junior Automation Support — a workflow and automation specialist. "
@@ -297,93 +303,200 @@ def _match_template(category: str) -> str:
 
 # ─── Self-Help Suggestions Engine ────────────────────────────────────────────
 
-SELF_HELP_SYSTEM_PROMPT = """You are TicketIQ's self-help engine for enterprise employees.
+SELF_HELP_SYSTEM_PROMPT = """You are TicketIQ's first-line resolution engine for enterprise employees.
 
-A support ticket was just submitted. Your job is to give the employee
-3–5 practical things they can try RIGHT NOW while waiting for the agent.
+A support ticket was just submitted. Your goal is to ACTUALLY SOLVE the problem
+right now if you possibly can — not just hand out generic troubleshooting tips.
+Think like an experienced colleague sitting next to them who knows the answer.
 
-RULES:
-1. Be specific to their exact problem — no generic advice
-2. Each step must be immediately actionable (no "contact IT" — they already did)
-3. Order by easiest/fastest first
-4. If a step is risky (e.g. reinstall), flag it with a warning
-5. Include an estimated time for each step e.g. "2 min"
-6. Keep each step under 20 words
-7. Add a "success indicator" — how they'll know if it worked
+CORE PRINCIPLES:
+1. ATTEMPT A REAL ANSWER FIRST. If the ticket is a question you can answer directly
+   (e.g. "how many leave days do I get", "what's the WiFi password policy",
+   "how do I submit an expense claim", "what's the process for X") — answer it
+   in `likely_solution` using standard enterprise policy/knowledge. Be specific
+   and confident, but note it should be confirmed by the agent if it's a
+   binding policy/financial decision.
+2. FOR TECHNICAL ISSUES (VPN, password, laptop, printer, software, AI tools) —
+   give concrete fix steps that have a real chance of resolving it, in the
+   correct order (cheapest/safest/most-likely-to-work first).
+3. PREVENT THE PROBLEM FROM GETTING WORSE. Always include a `do_not_do` list —
+   specific actions the employee should AVOID while waiting (e.g. "don't submit
+   the form again — this can create duplicate records", "don't restart the
+   server", "don't uninstall the VPN client — reinstalling can lose saved configs").
+4. NEVER suggest "ask a colleague if they have the same issue" or "take a
+   screenshot for the agent" as a primary step — these don't solve anything.
+   A screenshot can be mentioned ONLY as a secondary note inside `escalate_if`,
+   never as a numbered step.
+5. Each step must be something that could plausibly FIX the issue, not just
+   gather information.
+6. Include an estimated time for each step e.g. "2 min"
+7. Keep each step under 25 words
+8. Add a "success_indicator" — how they'll know if it worked
 
 Respond ONLY with valid JSON:
 {
   "can_self_resolve": true/false,
   "confidence": 0.0-1.0,
   "summary": "one sentence: what this problem likely is",
+  "likely_solution": "If this is a question with a known answer, answer it directly here in 1-3 sentences. If it's a technical fault with no single-shot answer, set this to null.",
   "steps": [
     {
       "order": 1,
       "title": "Short action title",
-      "instruction": "Exact step to take",
+      "instruction": "Exact step to take that could fix the issue",
       "time_estimate": "2 min",
       "risk": "none|low|medium",
       "success_indicator": "How you know it worked"
     }
   ],
-  "escalate_if": "condition under which they should not wait and escalate immediately",
+  "do_not_do": [
+    "Specific action to avoid that could make things worse or complicate the agent's fix"
+  ],
+  "escalate_if": "condition under which they should stop trying and wait for the agent",
   "useful_links": [
     {"label": "link label", "url": "real URL if applicable or null"}
   ]
 }"""
 
 
-SELF_HELP_FALLBACK: dict[str, list[dict]] = {
-    "vpn": [
-        {"order": 1, "title": "Restart VPN client",          "instruction": "Fully quit and reopen your VPN application",                       "time_estimate": "1 min",  "risk": "none",   "success_indicator": "VPN connects and shows green status"},
-        {"order": 2, "title": "Check internet connection",    "instruction": "Open a browser and go to google.com to confirm internet works",     "time_estimate": "30 sec", "risk": "none",   "success_indicator": "Page loads normally"},
-        {"order": 3, "title": "Switch network",               "instruction": "Try connecting from a different WiFi network or mobile hotspot",    "time_estimate": "2 min",  "risk": "none",   "success_indicator": "VPN connects on alternate network"},
-        {"order": 4, "title": "Flush DNS cache",              "instruction": "Run: ipconfig /flushdns in Command Prompt as Administrator",        "time_estimate": "2 min",  "risk": "low",    "success_indicator": "VPN connects after DNS flush"},
-        {"order": 5, "title": "Check VPN server status",      "instruction": "Ask a colleague if their VPN is working — may be a server issue",  "time_estimate": "1 min",  "risk": "none",   "success_indicator": "Colleague confirms same issue = server side"},
-    ],
-    "password": [
-        {"order": 1, "title": "Try password reset portal",    "instruction": "Go to your company's self-service password reset portal",          "time_estimate": "3 min",  "risk": "none",   "success_indicator": "New password works on login"},
-        {"order": 2, "title": "Check CAPS LOCK",              "instruction": "Ensure Caps Lock is off and try your password again",              "time_estimate": "30 sec", "risk": "none",   "success_indicator": "Login succeeds"},
-        {"order": 3, "title": "Try Incognito window",         "instruction": "Open a private/incognito browser window and try logging in",       "time_estimate": "1 min",  "risk": "none",   "success_indicator": "Login succeeds in private window"},
-        {"order": 4, "title": "Clear browser cache",          "instruction": "Press Ctrl+Shift+Delete → clear cookies and cache → retry login",  "time_estimate": "2 min",  "risk": "low",    "success_indicator": "Login page refreshes and works"},
-    ],
-    "laptop": [
-        {"order": 1, "title": "Restart your laptop",          "instruction": "Save all work, then do a full restart (not sleep/hibernate)",       "time_estimate": "3 min",  "risk": "none",   "success_indicator": "Issue doesn't reappear after restart"},
-        {"order": 2, "title": "Free up disk space",           "instruction": "Open File Explorer → right-click C: drive → Properties → Disk Cleanup", "time_estimate": "5 min", "risk": "low", "success_indicator": "Storage below 90%, laptop runs faster"},
-        {"order": 3, "title": "Close background apps",        "instruction": "Press Ctrl+Shift+Esc → end tasks using high CPU/memory",           "time_estimate": "2 min",  "risk": "low",    "success_indicator": "CPU usage drops below 50%"},
-        {"order": 4, "title": "Check for Windows updates",    "instruction": "Settings → Windows Update → check for pending updates",            "time_estimate": "5 min",  "risk": "low",    "success_indicator": "No pending updates blocking performance"},
-    ],
-    "leave": [
-        {"order": 1, "title": "Check HR portal first",        "instruction": "Log into the HR portal and check if leave can be submitted directly", "time_estimate": "2 min", "risk": "none",  "success_indicator": "Leave request submitted without agent help"},
-        {"order": 2, "title": "Check leave balance",          "instruction": "In the HR portal → My Leave → check your current balance",          "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Balance confirmed before agent reviews"},
-        {"order": 3, "title": "Notify your manager directly", "instruction": "Email your direct manager about the planned leave dates now",        "time_estimate": "2 min",  "risk": "none",  "success_indicator": "Manager acknowledged — process can proceed"},
-    ],
-    "expense": [
-        {"order": 1, "title": "Check receipts are attached",  "instruction": "Open your expense claim and verify all receipts are uploaded",       "time_estimate": "2 min",  "risk": "none",  "success_indicator": "All receipts visible in the claim"},
-        {"order": 2, "title": "Check claim amount limits",    "instruction": "Review the expense policy for per-item and daily limits",            "time_estimate": "2 min",  "risk": "none",  "success_indicator": "Claim is within policy limits"},
-        {"order": 3, "title": "Verify expense category",      "instruction": "Ensure the correct expense category is selected on the claim",       "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Category matches the type of expense"},
-    ],
-    "email": [
-        {"order": 1, "title": "Check email server status",    "instruction": "Ask a colleague if their email is working",                         "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Colleague confirms same issue = server side"},
-        {"order": 2, "title": "Restart Outlook",              "instruction": "Fully close Outlook (check system tray) and reopen it",             "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Emails load and sync normally"},
-        {"order": 3, "title": "Check account settings",       "instruction": "File → Account Settings → verify your account shows Connected",     "time_estimate": "2 min",  "risk": "none",  "success_indicator": "Account status shows Connected"},
-        {"order": 4, "title": "Clear Outlook cache",          "instruction": "Close Outlook → delete OST file in AppData → reopen Outlook",       "time_estimate": "10 min", "risk": "medium","success_indicator": "Outlook rebuilds and syncs successfully"},
-    ],
-    "printer": [
-        {"order": 1, "title": "Restart printer",              "instruction": "Turn printer off, wait 10 seconds, turn back on",                   "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Printer ready light is solid green"},
-        {"order": 2, "title": "Clear print queue",            "instruction": "Settings → Printers → right-click printer → See what's printing → cancel all", "time_estimate": "2 min", "risk": "none", "success_indicator": "Print queue is empty"},
-        {"order": 3, "title": "Reconnect to printer",         "instruction": "Settings → Printers → remove printer → Add a printer → re-add it", "time_estimate": "3 min",  "risk": "low",   "success_indicator": "Test page prints successfully"},
-    ],
-    "facilities": [
-        {"order": 1, "title": "Check if others affected",     "instruction": "Ask nearby colleagues if they have the same issue",                  "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Determine if it's isolated or widespread"},
-        {"order": 2, "title": "Document the issue",           "instruction": "Take a photo of the problem to share with the agent",               "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Photo ready to attach to ticket"},
-        {"order": 3, "title": "Check if safety risk",         "instruction": "If it's a safety hazard, contact reception or security immediately", "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Safety issue escalated to correct team"},
-    ],
-    "general": [
-        {"order": 1, "title": "Restart the affected system",  "instruction": "A full restart resolves many common issues",                        "time_estimate": "3 min",  "risk": "none",  "success_indicator": "Issue doesn't reappear after restart"},
-        {"order": 2, "title": "Check for known outages",      "instruction": "Ask a colleague if they have the same issue",                       "time_estimate": "1 min",  "risk": "none",  "success_indicator": "Determine if issue is widespread"},
-        {"order": 3, "title": "Document the error",           "instruction": "Take a screenshot of any error messages before they disappear",     "time_estimate": "30 sec", "risk": "none",  "success_indicator": "Error captured and ready to share with agent"},
-    ],
+SELF_HELP_FALLBACK: dict[str, dict] = {
+    "vpn": {
+        "summary": "VPN connectivity issue — usually fixed by a client restart or network switch.",
+        "likely_solution": None,
+        "steps": [
+            {"order": 1, "title": "Restart VPN client",       "instruction": "Fully quit (check system tray) and reopen your VPN application, then reconnect", "time_estimate": "1 min",  "risk": "none", "success_indicator": "VPN connects and shows a green/connected status"},
+            {"order": 2, "title": "Flush DNS cache",          "instruction": "Open Command Prompt as Administrator and run: ipconfig /flushdns, then retry",     "time_estimate": "2 min",  "risk": "low",  "success_indicator": "VPN connects successfully after the flush"},
+            {"order": 3, "title": "Switch network",           "instruction": "Disconnect from current WiFi and connect via mobile hotspot, then retry VPN",       "time_estimate": "2 min",  "risk": "none", "success_indicator": "VPN connects on the alternate network — confirms ISP/firewall issue"},
+            {"order": 4, "title": "Reset adapter",            "instruction": "Settings → Network → disable then re-enable your network adapter, then reconnect", "time_estimate": "2 min",  "risk": "low",  "success_indicator": "VPN handshake completes without timeout"},
+        ],
+        "do_not_do": [
+            "Don't uninstall/reinstall the VPN client — this can wipe saved configuration profiles the agent would need",
+            "Don't repeatedly mash 'connect' — some VPN servers temporarily lock accounts after rapid failed attempts",
+        ],
+        "escalate_if": "VPN still fails after a network switch — this points to a server-side or account issue the agent must fix.",
+    },
+    "password": {
+        "summary": "Account access issue — most password problems are fixed by self-service reset or a cache clear.",
+        "likely_solution": "If you have access to your recovery email or phone, use the self-service password reset link on the login page — this resolves most lockouts within minutes without needing IT.",
+        "steps": [
+            {"order": 1, "title": "Use self-service reset",   "instruction": "Click 'Forgot password' on the login page and follow the email/SMS verification flow", "time_estimate": "3 min",  "risk": "none", "success_indicator": "You receive a reset link and can set a new password"},
+            {"order": 2, "title": "Check Caps Lock / keyboard","instruction": "Confirm Caps Lock is off and type your password into a text editor first to verify it's correct", "time_estimate": "30 sec", "risk": "none", "success_indicator": "Password matches what you intended to type"},
+            {"order": 3, "title": "Try a private window",     "instruction": "Open an incognito/private browser window and attempt login there",                 "time_estimate": "1 min",  "risk": "none", "success_indicator": "Login succeeds — confirms a saved-cookie/cache issue"},
+            {"order": 4, "title": "Clear saved credentials",  "instruction": "Clear browser cookies/cache for this site, then retry login with the correct password", "time_estimate": "2 min", "risk": "low",  "success_indicator": "Login page accepts the credentials"},
+        ],
+        "do_not_do": [
+            "Don't attempt more than 3-5 logins in a row — most systems lock the account after repeated failures, which makes the IT fix slower",
+            "Don't share your password over chat/email even to a colleague trying to help",
+        ],
+        "escalate_if": "Self-service reset email/SMS never arrives after 5 minutes, or the account shows as locked — this needs an IT-side unlock.",
+    },
+    "laptop": {
+        "summary": "Device performance/hardware issue — often resolved by freeing resources or a clean restart.",
+        "likely_solution": None,
+        "steps": [
+            {"order": 1, "title": "Close high-usage apps",    "instruction": "Press Ctrl+Shift+Esc, sort by CPU/Memory, and close anything you don't need running", "time_estimate": "2 min",  "risk": "low",  "success_indicator": "CPU usage drops below 50% and the system feels more responsive"},
+            {"order": 2, "title": "Restart (not sleep)",      "instruction": "Save your work, then Start → Power → Restart (a full restart, not sleep/hibernate)",   "time_estimate": "3 min",  "risk": "none", "success_indicator": "Issue doesn't reappear after the restart"},
+            {"order": 3, "title": "Free disk space",          "instruction": "Open Settings → System → Storage → Temporary files, and delete temp/cache files",     "time_estimate": "5 min",  "risk": "low",  "success_indicator": "Free space above 10% of total drive capacity"},
+            {"order": 4, "title": "Check battery/power mode", "instruction": "If on battery, switch to 'Best Performance' power mode in Settings → Power",          "time_estimate": "1 min",  "risk": "none", "success_indicator": "Performance improves immediately on plugged-in/best-performance mode"},
+        ],
+        "do_not_do": [
+            "Don't run a full disk check (chkdsk) or factory reset — this can take hours and may need IT supervision",
+            "Don't install random 'PC cleaner' tools from the internet — some are malware",
+        ],
+        "escalate_if": "Performance doesn't improve after closing apps and restarting, or the laptop shows hardware warnings/blue screens.",
+    },
+    "leave": {
+        "summary": "Leave request or policy question — many of these can be answered immediately from standard policy.",
+        "likely_solution": "Standard leave process: submit your request through the HR portal at least 2 weeks in advance for planned leave, and notify your direct manager so coverage can be arranged. Most companies grant 15-25 annual leave days, accrued monthly — check 'My Leave' in the portal for your exact balance. Sick leave usually doesn't require advance notice but does need a same-day notification to your manager.",
+        "steps": [
+            {"order": 1, "title": "Check the HR portal",      "instruction": "Log into the HR portal → My Leave → check your current balance and submit directly if possible", "time_estimate": "2 min", "risk": "none", "success_indicator": "Request submitted or balance confirmed without waiting for the agent"},
+            {"order": 2, "title": "Notify your manager now",  "instruction": "Send your manager a quick message with your planned dates so planning isn't delayed",  "time_estimate": "2 min",  "risk": "none", "success_indicator": "Manager acknowledges — your dates are on their radar regardless of ticket status"},
+        ],
+        "do_not_do": [
+            "Don't submit the same leave request multiple times — duplicate requests can cause confusion in the approval workflow",
+            "Don't book non-refundable travel until the leave is formally approved",
+        ],
+        "escalate_if": "The HR portal shows an error, your balance looks incorrect, or this involves a special leave type (maternity/paternity/medical) needing documentation.",
+    },
+    "expense": {
+        "summary": "Expense claim issue — most rejections are due to missing receipts or wrong category.",
+        "likely_solution": "Common reasons claims get rejected: missing/illegible receipts, the wrong expense category selected, or the amount exceeding the per-item policy limit (commonly client meals are capped around R500-R1000 depending on company policy). Check these three things first — if all are correct, the agent will need to review the specific rejection reason.",
+        "steps": [
+            {"order": 1, "title": "Verify receipts attached", "instruction": "Open the claim and confirm every line item has a clear, itemised receipt attached", "time_estimate": "2 min", "risk": "none", "success_indicator": "All receipts visible and legible in the claim"},
+            {"order": 2, "title": "Check category & limits",  "instruction": "Confirm the expense category matches the policy and the amount is within the per-item limit", "time_estimate": "2 min", "risk": "none", "success_indicator": "Category and amount both align with policy"},
+            {"order": 3, "title": "Resubmit if you find the issue", "instruction": "If a receipt was missing/wrong category, correct it and resubmit through the portal directly", "time_estimate": "3 min", "risk": "none", "success_indicator": "Claim status changes to 'Pending Review' again"},
+        ],
+        "do_not_do": [
+            "Don't submit a duplicate claim alongside the rejected one — this creates double-entries Finance has to manually reconcile",
+        ],
+        "escalate_if": "Receipts, category, and amount all look correct but the claim is still rejected — this needs Finance to check the system-side reason.",
+    },
+    "email": {
+        "summary": "Email/Outlook sync issue — usually fixed by an app restart or reconnecting the account.",
+        "likely_solution": None,
+        "steps": [
+            {"order": 1, "title": "Restart Outlook fully",    "instruction": "Close Outlook completely (check it's not in the system tray), then reopen it", "time_estimate": "1 min", "risk": "none", "success_indicator": "Inbox refreshes and new emails appear"},
+            {"order": 2, "title": "Check account status",     "instruction": "File → Account Settings → confirm your account shows 'Connected', not 'Disconnected'", "time_estimate": "1 min", "risk": "none", "success_indicator": "Status reads Connected"},
+            {"order": 3, "title": "Check webmail access",     "instruction": "Try logging into the webmail (browser) version with the same credentials",       "time_estimate": "2 min", "risk": "none", "success_indicator": "Webmail works — confirms the issue is local to the Outlook app, not the account"},
+        ],
+        "do_not_do": [
+            "Don't delete and recreate the email account in Outlook — this can cause local data/rules to be lost",
+        ],
+        "escalate_if": "Webmail also fails, or your account shows as locked/disabled — this is an account-level issue for IT.",
+    },
+    "printer": {
+        "summary": "Printer issue — clearing the queue or restarting the printer fixes most jams/offline errors.",
+        "likely_solution": None,
+        "steps": [
+            {"order": 1, "title": "Restart the printer",      "instruction": "Power the printer off, wait 10 seconds, then power it back on and wait for it to be ready", "time_estimate": "2 min", "risk": "none", "success_indicator": "Printer status light turns solid (not blinking/error)"},
+            {"order": 2, "title": "Clear the print queue",    "instruction": "Settings → Printers & Scanners → open the printer → cancel all pending print jobs", "time_estimate": "2 min", "risk": "none", "success_indicator": "Queue shows empty, no stuck jobs"},
+            {"order": 3, "title": "Re-send the print job",    "instruction": "After clearing the queue and confirming the printer is ready, send your document again", "time_estimate": "1 min", "risk": "none", "success_indicator": "Document prints successfully"},
+        ],
+        "do_not_do": [
+            "Don't keep clicking 'Print' repeatedly on a stuck job — this stacks up the queue and makes it harder to clear",
+            "Don't open the printer and pull out paper unless you can see exactly where it's jammed — this can damage the rollers",
+        ],
+        "escalate_if": "Printer still shows offline/error after a restart and queue clear, or there's a visible paper jam you can't safely remove.",
+    },
+    "facilities": {
+        "summary": "Facilities/maintenance issue — safety-relevant issues should be flagged immediately to reception/security.",
+        "likely_solution": None,
+        "steps": [
+            {"order": 1, "title": "Assess if it's a safety risk", "instruction": "If there's any risk of injury (broken glass, exposed wiring, sharp edges), move away from the area now", "time_estimate": "1 min", "risk": "none", "success_indicator": "You and others are at a safe distance"},
+            {"order": 2, "title": "Use a temporary alternative", "instruction": "If possible, relocate to another desk/meeting room while this one is fixed", "time_estimate": "2 min", "risk": "none", "success_indicator": "You can continue working without disruption"},
+        ],
+        "do_not_do": [
+            "Don't attempt to repair electrical, hydraulic, or structural issues yourself",
+            "Don't continue using broken equipment (e.g. a chair with a failed hydraulic) — this risks injury",
+        ],
+        "escalate_if": "This is a safety hazard — contact reception or security immediately rather than waiting for the ticket.",
+    },
+    "automation": {
+        "summary": "Workflow/automation failure — check whether the trigger conditions were actually met before assuming it's broken.",
+        "likely_solution": None,
+        "steps": [
+            {"order": 1, "title": "Re-check trigger conditions", "instruction": "Confirm the action that should have triggered the workflow was completed correctly (e.g. form fully submitted, correct status set)", "time_estimate": "2 min", "risk": "none", "success_indicator": "Trigger conditions confirmed as met"},
+            {"order": 2, "title": "Check for a delay",        "instruction": "Some scheduled workflows run on a delay (e.g. hourly/nightly) — wait one cycle and check again", "time_estimate": "5 min", "risk": "none", "success_indicator": "Workflow completes on its next scheduled run"},
+            {"order": 3, "title": "Note exact timestamps",    "instruction": "Write down when the trigger action happened and when you expected the workflow to run — the agent will need this", "time_estimate": "1 min", "risk": "none", "success_indicator": "Timestamps ready to share with the agent"},
+        ],
+        "do_not_do": [
+            "Don't repeat the triggering action multiple times — this can create duplicate workflow runs once the automation is fixed",
+            "Don't manually perform the steps the workflow should do — this can conflict with the automation when it catches up",
+        ],
+        "escalate_if": "The trigger conditions were definitely met and a full scheduled cycle has passed with no result — this is a genuine automation failure.",
+    },
+    "general": {
+        "summary": "General issue — a restart resolves many common problems, but check the details below first.",
+        "likely_solution": None,
+        "steps": [
+            {"order": 1, "title": "Restart the affected system", "instruction": "Save your work and do a full restart of the affected application or device", "time_estimate": "3 min", "risk": "none", "success_indicator": "Issue doesn't reappear after restart"},
+            {"order": 2, "title": "Note exact error details",  "instruction": "Write down the exact error message, when it started, and what you were doing — this speeds up the agent's fix", "time_estimate": "1 min", "risk": "none", "success_indicator": "Details ready to share, agent can act faster"},
+        ],
+        "do_not_do": [
+            "Don't repeat the action that caused the error multiple times — this can make logs harder to read for the agent",
+        ],
+        "escalate_if": "The issue is blocking your work entirely or involves data loss/security — flag this as urgent rather than waiting.",
+    },
 }
 
 
@@ -430,17 +543,30 @@ async def generate_self_help(
     # Keyword fallback
     text = (title + " " + description + " " + category).lower()
     key = "general"
-    for k in ["vpn", "password", "laptop", "leave", "expense", "email", "printer", "facilities"]:
-        if k in text:
+    for k, matches in [
+        ("vpn",        ["vpn", "remote access", "network connect"]),
+        ("password",   ["password", "login", "locked out", "can't log in", "cannot log in", "access denied"]),
+        ("automation", ["workflow", "automation", "scheduled job", "integration", "approval flow"]),
+        ("laptop",     ["laptop", "computer", "pc ", "slow", "freezing", "crash"]),
+        ("leave",      ["leave", "vacation", "annual leave", "sick leave", "time off", "pto"]),
+        ("expense",    ["expense", "reimbursement", "claim", "receipt"]),
+        ("email",      ["email", "outlook", "inbox", "mailbox"]),
+        ("printer",    ["printer", "printing", "print job"]),
+        ("facilities", ["facilities", "office", "chair", "desk", "building", "maintenance"]),
+    ]:
+        if any(m in text for m in matches):
             key = k
             break
 
+    tpl = SELF_HELP_FALLBACK[key]
     return {
         "can_self_resolve": key != "general",
         "confidence":       0.70,
-        "summary":          f"Common {category} issue — try these steps while your ticket is being reviewed.",
-        "steps":            SELF_HELP_FALLBACK[key],
-        "escalate_if":      "Issue involves data loss, security breach, or complete work blockage",
+        "summary":          tpl["summary"],
+        "likely_solution":  tpl.get("likely_solution"),
+        "steps":            tpl["steps"],
+        "do_not_do":        tpl.get("do_not_do", []),
+        "escalate_if":      tpl["escalate_if"],
         "useful_links":     [],
         "generated_by":     "template",
     }

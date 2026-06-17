@@ -321,11 +321,16 @@ async def get_ai_reply(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
+    from app.api.v1.endpoints.admin import _read_settings
+    settings_cfg = _read_settings()
+    if not settings_cfg.get("auto_reply", True):
+        return {"reply": None, "enabled": False}
+
     dept_name  = ticket.department.name if ticket.department else "Support"
     category   = (ticket.ai_classification or {}).get("category", "General")
     agent_role = getattr(current_user, "agent_role_key", None) or "it_support_technician"
     reply = await generate_ai_reply(ticket.title, ticket.description, dept_name, category, agent_role)
-    return {"reply": reply}
+    return {"reply": reply, "enabled": True}
 
 
 # ─── Automated Response Endpoints ─────────────────────────────────────────────
@@ -352,9 +357,12 @@ async def auto_response(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
+    from app.api.v1.endpoints.admin import _read_settings
+    settings_cfg = _read_settings()
+
     ai    = ticket.ai_classification or {}
     role  = current_user.agent_role_key if hasattr(current_user, "agent_role_key") else "admin"
-    tone  = req.tone if req.tone in ("formal", "friendly", "urgent") else "formal"
+    tone  = req.tone if req.tone in ("formal", "friendly", "urgent") else settings_cfg.get("tone_default", "formal")
 
     from app.services.ai.response_service import generate_auto_response as _gen
     resp = await _gen(
@@ -414,16 +422,23 @@ async def get_self_help(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
+    from app.api.v1.endpoints.admin import _read_settings
+    settings_cfg = _read_settings()
+    if not settings_cfg.get("self_help", True):
+        return {"enabled": False}
+
     ai       = ticket.ai_classification or {}
     dept     = ticket.department.name if ticket.department else "Support"
     category = ai.get("category", "General Support")
     priority = ticket.priority.value if hasattr(ticket.priority, "value") else str(ticket.priority)
 
     from app.services.ai.response_service import generate_self_help
-    return await generate_self_help(
+    result = await generate_self_help(
         title       = ticket.title,
         description = ticket.description,
         category    = category,
         department  = dept,
         priority    = priority,
     )
+    result["enabled"] = True
+    return result
