@@ -79,8 +79,18 @@ async def _auto_seed():
             dept_map[d["slug"]] = ex
 
         # Users — create or update name/title
+        # Also handle cases where old accounts (different email) hold the same employee_id
         for email, pw, name, role, eid, title, dept_slug, ark in USERS:
+            # First try by email
             ex = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+
+            if not ex and eid:
+                # Check if an old account owns this employee_id — free it up
+                old = (await db.execute(select(User).where(User.employee_id == eid))).scalar_one_or_none()
+                if old:
+                    old.employee_id = f"OLD-{old.employee_id}"
+                    await db.flush()
+
             if ex:
                 ex.full_name   = name
                 ex.job_title   = title

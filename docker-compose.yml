@@ -15,7 +15,7 @@ services:
       # Allow browser + frontend container
       CORS_ORIGINS: "http://localhost:3000,http://frontend:3000,http://ticketiq-frontend:3000"
     volumes:
-      - sqlite_data:/app/data
+      - ./backend/app/data:/app/data
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
       interval: 10s
@@ -36,7 +36,3 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-
-volumes:
-  sqlite_data:
-    name: ticketiq_sqlite_data

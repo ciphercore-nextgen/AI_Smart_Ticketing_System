@@ -91,7 +91,12 @@ export const ticketsApi = {
     api.post(`/tickets/${id}/auto-response`, { tone, trigger }),
   autoResponseAllTones: (id: string, trigger = 'agent_reply') =>
     api.get(`/tickets/${id}/auto-response/all-tones?trigger=${trigger}`),
-  selfHelp:     (id: string)                             => api.get(`/tickets/${id}/self-help`),
+  selfHelp:     (id: string, regenerate = false) =>
+    api.get(`/tickets/${id}/self-help${regenerate ? '?regenerate=true' : ''}`),
+  selfHelpProgress: (id: string, stepsDone: number[]) =>
+    api.patch(`/tickets/${id}/self-help-progress`, { steps_done: stepsDone }),
+  selfHelpOutcome: (id: string, resolved: boolean, stepsDone: number[]) =>
+    api.post(`/tickets/${id}/self-help-outcome`, { resolved, steps_done: stepsDone }),
 }
 
 // ─── Admin ────────────────────────────────────────────────────────────────────

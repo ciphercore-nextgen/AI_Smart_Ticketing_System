@@ -4,13 +4,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Lightbulb, ChevronDown, Clock, AlertTriangle,
   CheckCircle, Circle, Zap, RefreshCw, ExternalLink,
-  Sparkles, ShieldAlert
+  Sparkles, ShieldAlert, ThumbsUp, ThumbsDown, Loader
 } from 'lucide-react'
 import { ticketsApi } from '@/lib/api'
+import toast from 'react-hot-toast'
 
 const RISK_CONFIG = {
-  none:   { label: 'Safe',    color: 'text-green-400',  bg: 'bg-green-500/10' },
-  low:    { label: 'Low risk',color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
+  none:   { label: 'Safe',     color: 'text-green-400',  bg: 'bg-green-500/10'  },
+  low:    { label: 'Low risk', color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
   medium: { label: 'Caution', color: 'text-orange-400', bg: 'bg-orange-500/10' },
 }
 
@@ -36,23 +37,31 @@ interface SelfHelpData {
   generated_by?: string
 }
 
+type OutcomeState = 'idle' | 'submitting' | 'resolved' | 'not_resolved'
+
 interface Props {
   ticketId: string
-  autoLoad?: boolean   // true = load immediately on mount
+  autoLoad?: boolean
 }
 
 export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
-  const [open,      setOpen]      = useState(autoLoad)
-  const [data,      setData]      = useState<SelfHelpData | null>(null)
-  const [loading,   setLoading]   = useState(false)
-  const [checked,   setChecked]   = useState<Set<number>>(new Set())
+  const [open,    setOpen]    = useState(autoLoad)
+  const [data,    setData]    = useState<SelfHelpData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [checked, setChecked] = useState<Set<number>>(new Set())
+  const [outcome, setOutcome] = useState<OutcomeState>('idle')
 
-  const load = async () => {
-    if (data) return   // already loaded
+  const load = async (force = false) => {
+    if (data && !force) return
     setLoading(true)
     try {
-      const { data: res } = await ticketsApi.selfHelp(ticketId)
+      const { data: res } = await ticketsApi.selfHelp(ticketId, force)
       setData(res)
+      // Restore exactly where the employee left off — which steps were
+      // already checked, and whether they already submitted an outcome —
+      // so navigating away and back doesn't lose progress.
+      setChecked(new Set<number>(res.steps_done ?? []))
+      setOutcome(res.resolved === true ? 'resolved' : res.resolved === false ? 'not_resolved' : 'idle')
     } catch {
       // silent — self-help is optional
     } finally {
@@ -60,10 +69,7 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
     }
   }
 
-  // Auto-load on mount if flag set
-  useEffect(() => {
-    if (autoLoad) load()
-  }, [ticketId])
+  useEffect(() => { if (autoLoad) load() }, [ticketId]) // eslint-disable-line
 
   const toggle = () => {
     setOpen(o => !o)
@@ -71,15 +77,36 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
   }
 
   const toggleStep = (order: number) => {
+    if (outcome !== 'idle') return
     setChecked(prev => {
       const next = new Set(prev)
       next.has(order) ? next.delete(order) : next.add(order)
+      // Fire-and-forget persist — so checked steps survive navigating away
+      // and back, even before a final yes/no outcome is submitted.
+      ticketsApi.selfHelpProgress(ticketId, Array.from(next)).catch(() => {})
       return next
     })
   }
 
+  const reportOutcome = async (resolved: boolean) => {
+    setOutcome('submitting')
+    try {
+      await ticketsApi.selfHelpOutcome(ticketId, resolved, Array.from(checked))
+      setOutcome(resolved ? 'resolved' : 'not_resolved')
+      if (resolved) {
+        toast.success('Great! Your ticket has been automatically resolved.')
+      } else {
+        toast('Got it — an agent will prioritise your ticket.', { icon: '👍' })
+      }
+    } catch {
+      setOutcome('idle')
+      toast.error('Could not submit outcome — please try again.')
+    }
+  }
+
   const completedCount = checked.size
-  const totalSteps     = data?.steps?.length || 0
+  const totalSteps     = data?.steps?.length ?? 0
+  const allDone        = totalSteps > 0 && completedCount === totalSteps
 
   return (
     <div className="border border-amber-500/20 rounded-xl overflow-hidden">
@@ -96,20 +123,23 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
           <span className="text-sm font-medium text-amber-300">
             While you wait — try these first
           </span>
-          {data && (
+          {outcome === 'resolved' && (
+            <span className="text-xs text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <CheckCircle className="w-3 h-3" /> Issue resolved
+            </span>
+          )}
+          {outcome === 'not_resolved' && (
+            <span className="text-xs text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full">
+              Agent notified
+            </span>
+          )}
+          {outcome === 'idle' && data && (
             <span className="text-xs text-amber-500/70">
               {completedCount}/{totalSteps} steps done
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          {data && completedCount > 0 && completedCount === totalSteps && (
-            <span className="text-xs text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
-              <CheckCircle className="w-3 h-3" /> All tried
-            </span>
-          )}
-          <ChevronDown className={`w-4 h-4 text-amber-500/60 transition-transform ${open ? 'rotate-180' : ''}`} />
-        </div>
+        <ChevronDown className={`w-4 h-4 text-amber-500/60 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       <AnimatePresence>
@@ -127,11 +157,11 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
               {loading && (
                 <div className="flex items-center gap-2 py-4 justify-center">
                   <div className="w-4 h-4 border-2 border-amber-500/30 border-t-amber-400 rounded-full animate-spin" />
-                  <span className="text-sm text-amber-400/70">AI is generating self-help steps...</span>
+                  <span className="text-sm text-amber-400/70">Generating self-help steps…</span>
                 </div>
               )}
 
-              {/* Self-help disabled by admin */}
+              {/* Disabled by admin */}
               {data && data.enabled === false && (
                 <div className="py-4 text-center">
                   <p className="text-sm text-gray-400">Self-help suggestions are currently turned off.</p>
@@ -139,12 +169,45 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                 </div>
               )}
 
-              {data && data.enabled !== false && (
+              {/* Resolved outcome */}
+              {outcome === 'resolved' && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="rounded-xl bg-green-500/5 border border-green-500/25 p-5 text-center"
+                >
+                  <CheckCircle className="w-10 h-10 text-green-400 mx-auto mb-3" />
+                  <p className="text-base font-semibold text-green-300">Glad it worked!</p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Your ticket has been automatically resolved. An agent will do a quick
+                    check to confirm everything is working correctly.
+                  </p>
+                </motion.div>
+              )}
+
+              {/* Not resolved outcome */}
+              {outcome === 'not_resolved' && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="rounded-xl bg-blue-500/5 border border-blue-500/25 p-5 text-center"
+                >
+                  <Lightbulb className="w-10 h-10 text-blue-400 mx-auto mb-3" />
+                  <p className="text-base font-semibold text-blue-300">We've got you</p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Your agent has been notified that you tried the self-help steps and
+                    the issue persists. They'll prioritise your ticket.
+                  </p>
+                </motion.div>
+              )}
+
+              {/* Main content */}
+              {data && data.enabled !== false && outcome === 'idle' && (
                 <>
                   {/* Summary + confidence */}
                   <div className="flex items-start gap-3">
                     <div className="flex-1">
-                      <p className="text-sm text-gray-300 leading-relaxed">{data.summary ?? ""}</p>
+                      <p className="text-sm text-gray-300 leading-relaxed">{data.summary ?? ''}</p>
                       <div className="flex items-center gap-3 mt-2">
                         <span className={`text-xs px-2 py-0.5 rounded-full ${
                           (data.can_self_resolve ?? false)
@@ -164,7 +227,7 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                       </div>
                     </div>
                     <button
-                      onClick={() => { setData(null); setChecked(new Set()); load() }}
+                      onClick={() => { setData(null); setOutcome('idle'); load(true) }}
                       className="text-gray-600 hover:text-gray-400 transition flex-shrink-0"
                       title="Regenerate"
                     >
@@ -172,7 +235,7 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                     </button>
                   </div>
 
-                  {/* Likely solution — direct answer attempt */}
+                  {/* Likely solution */}
                   {data.likely_solution && (
                     <div className="flex items-start gap-2 bg-blue-500/5 border border-blue-500/20 rounded-lg p-3">
                       <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
@@ -205,13 +268,12 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                           layout
                           className={`rounded-lg border p-3 transition cursor-pointer ${
                             done
-                              ? 'bg-green-500/5 border-green-500/20 opacity-60'
+                              ? 'bg-green-500/5 border-green-500/20 opacity-70'
                               : 'bg-gray-900/50 border-gray-800/60 hover:border-amber-500/20'
                           }`}
                           onClick={() => toggleStep(step.order)}
                         >
                           <div className="flex items-start gap-3">
-                            {/* Checkbox */}
                             <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 mt-0.5 transition ${
                               done
                                 ? 'bg-green-500 border-green-500'
@@ -222,7 +284,6 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                                 : <span className="text-xs text-gray-500 font-mono">{step.order}</span>
                               }
                             </div>
-
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <p className={`text-sm font-medium ${done ? 'line-through text-gray-500' : 'text-white'}`}>
@@ -239,11 +300,7 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                                   )}
                                 </div>
                               </div>
-
-                              <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                                {step.instruction}
-                              </p>
-
+                              <p className="text-xs text-gray-400 mt-1 leading-relaxed">{step.instruction}</p>
                               {!done && (
                                 <p className="text-xs text-green-400/70 mt-1.5 flex items-center gap-1">
                                   <CheckCircle className="w-3 h-3" />
@@ -257,7 +314,7 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                     })}
                   </div>
 
-                  {/* Do not do — prevent things from getting worse */}
+                  {/* Do not do */}
                   {data.do_not_do && data.do_not_do.length > 0 && (
                     <div className="bg-orange-500/5 border border-orange-500/20 rounded-lg p-3">
                       <div className="flex items-center gap-1.5 mb-1.5">
@@ -291,18 +348,50 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                     <div className="space-y-1">
                       <p className="text-xs text-gray-600">Useful resources</p>
                       {(data.useful_links ?? []).filter(l => l.url).map((link, i) => (
-                        <a
-                          key={i}
-                          href={link.url!}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition"
-                        >
+                        <a key={i} href={link.url!} target="_blank" rel="noreferrer"
+                          className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition">
                           <ExternalLink className="w-3 h-3" /> {link.label}
                         </a>
                       ))}
                     </div>
                   )}
+
+                  {/* ── Outcome question ── */}
+                  {completedCount > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-xl bg-gray-900 border border-gray-700/60 p-4"
+                    >
+                      <p className="text-sm font-medium text-white text-center mb-3">
+                        Did {allDone ? 'these steps' : 'any of these steps'} fix your issue?
+                      </p>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => reportOutcome(true)}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition"
+                          style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', color: '#4ade80' }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(34,197,94,0.18)'}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(34,197,94,0.1)'}
+                        >
+                          <ThumbsUp className="w-4 h-4" /> Yes, it's fixed!
+                        </button>
+                        <button
+                          onClick={() => reportOutcome(false)}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition"
+                          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.15)'}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'}
+                        >
+                          <ThumbsDown className="w-4 h-4" /> No, still broken
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-600 text-center mt-2">
+                        If it's fixed, we'll automatically close your ticket. If not, your agent will be notified.
+                      </p>
+                    </motion.div>
+                  )}
+
                 </>
               )}
 

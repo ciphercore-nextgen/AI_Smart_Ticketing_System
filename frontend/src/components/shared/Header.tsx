@@ -3,7 +3,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Bell, Search, LogOut, Sun, Moon } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useRouter, usePathname } from 'next/navigation'
-import { authApi, notificationsApi } from '@/lib/api'
+import { authApi, notificationsApi, ticketsApi } from '@/lib/api'
+import { fetchAlertSummary, onReadStateChanged } from '@/lib/alerts'
 import { useTheme } from './ThemeProvider'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
@@ -16,33 +17,35 @@ export default function Header({ title, subtitle }: HeaderProps) {
   const router   = useRouter()
   const pathname = usePathname()
 
-  const [unread,   setUnread]   = useState(0)
-  const [lastSeen, setLastSeen] = useState<string | null>(null)
+  const [unread, setUnread] = useState(0)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const fetchUnread = useCallback(async () => {
+  // Recomputes the badge from the SAME alert list + read-state the alerts
+  // page uses, instead of a manually-incremented counter — so it always
+  // reflects what's actually still unread, no matter where it changed
+  // (opened an item, marked all read, a new alert arrived, etc.).
+  const refreshUnread = useCallback(async () => {
     try {
-      const res    = await notificationsApi.list(lastSeen ?? undefined)
-      const notifs: any[] = res.data.notifications || []
-      if (notifs.length === 0) return
-      setUnread(prev => prev + notifs.length)
-      const newest = notifs.reduce((a: any, b: any) =>
-        new Date(a.created_at) > new Date(b.created_at) ? a : b)
-      setLastSeen(newest.created_at)
+      const { unreadCount } = await fetchAlertSummary(ticketsApi, notificationsApi)
+      setUnread(unreadCount)
     } catch { /* silent */ }
-  }, [lastSeen])
+  }, [])
 
-  useEffect(() => { fetchUnread() }, [])   // eslint-disable-line
+  useEffect(() => { refreshUnread() }, [])   // eslint-disable-line
 
   useEffect(() => {
     if (pollRef.current) clearInterval(pollRef.current)
-    pollRef.current = setInterval(fetchUnread, 30_000)
+    pollRef.current = setInterval(refreshUnread, 30_000)
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, [fetchUnread])
+  }, [refreshUnread])
 
-  useEffect(() => {
-    if (pathname === '/alerts') setUnread(0)
-  }, [pathname])
+  // Recompute whenever the route changes — covers leaving /alerts after
+  // reading some items, and opening a ticket directly from a notification.
+  useEffect(() => { refreshUnread() }, [pathname]) // eslint-disable-line
+
+  // Recompute instantly when an item is marked read — covers reading
+  // several alerts (or hitting "mark all read") without leaving the page.
+  useEffect(() => onReadStateChanged(refreshUnread), [refreshUnread])
 
   const handleLogout = async () => {
     try { if (refresh_token) await authApi.logout(refresh_token) } catch {}
@@ -82,7 +85,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
 
-        <Link href="/alerts" onClick={() => setUnread(0)}>
+        <Link href="/alerts">
           <button
             className="relative flex items-center justify-center rounded-lg transition"
             style={{

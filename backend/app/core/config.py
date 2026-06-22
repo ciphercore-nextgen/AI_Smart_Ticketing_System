@@ -1,9 +1,18 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from typing import List
 
+# Anchor to the backend folder itself, NOT the process's current working
+# directory. Without this, starting the server from anywhere other than
+# `backend/` silently fails to find .env and falls back to defaults —
+# which is exactly how this project ended up with two divergent SQLite
+# databases (one seeded via Docker, one freshly re-seeded by a bare/local
+# run that couldn't find .env and didn't know it).
+_BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "sqlite+aiosqlite:///./ticketiq.db"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./app/data/ticketiq.db"
     SECRET_KEY: str = "change-me-in-production-this-must-be-at-least-32-chars!"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
@@ -15,7 +24,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:3000"
 
     class Config:
-        env_file = ".env"
+        env_file = str(_BACKEND_DIR / ".env")
         extra = "ignore"
 
     @property

@@ -118,6 +118,13 @@ class Ticket(Base):
     is_escalated      = Column(Boolean, default=False)
     resolution_note   = Column(Text, nullable=True)
 
+    # Self-help outcome tracking
+    self_help_shown      = Column(Boolean, default=False)
+    self_help_resolved   = Column(Boolean, nullable=True)   # True=fixed, False=not fixed, None=no response
+    self_help_steps_done = Column(JSON, nullable=True)      # list of step order numbers completed
+    self_help_outcome_at = Column(DateTime, nullable=True)  # when employee reported outcome
+    self_help_content    = Column(JSON, nullable=True)      # cached generated steps, so reloads are stable
+
     created_at  = Column(DateTime, default=utcnow)
     updated_at  = Column(DateTime, default=utcnow, onupdate=utcnow)
     resolved_at = Column(DateTime, nullable=True)

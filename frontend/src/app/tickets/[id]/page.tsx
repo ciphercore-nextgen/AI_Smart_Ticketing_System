@@ -466,6 +466,57 @@ export default function TicketDetailPage() {
         {/* Self-help panel */}
         <SelfHelpPanel ticketId={id} autoLoad={!isAgentOrAdmin} />
 
+        {/* Self-help outcome banner — agents only */}
+        {isAgentOrAdmin && ticket.self_help_shown && (
+          <div className={`rounded-xl border p-4 ${
+            ticket.self_help_resolved === true
+              ? 'bg-green-500/5 border-green-500/25'
+              : ticket.self_help_resolved === false
+              ? 'bg-orange-500/5 border-orange-500/25'
+              : 'bg-gray-800/40 border-gray-700/40'
+          }`}>
+            <div className="flex items-start gap-3">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                ticket.self_help_resolved === true ? 'bg-green-500/15' :
+                ticket.self_help_resolved === false ? 'bg-orange-500/15' : 'bg-gray-700/40'
+              }`}>
+                {ticket.self_help_resolved === true
+                  ? <CheckCircle className="w-4 h-4 text-green-400" />
+                  : ticket.self_help_resolved === false
+                  ? <AlertTriangle className="w-4 h-4 text-orange-400" />
+                  : <Sparkles className="w-4 h-4 text-gray-400" />
+                }
+              </div>
+              <div className="flex-1">
+                <p className={`text-sm font-semibold ${
+                  ticket.self_help_resolved === true ? 'text-green-300' :
+                  ticket.self_help_resolved === false ? 'text-orange-300' : 'text-gray-300'
+                }`}>
+                  {ticket.self_help_resolved === true
+                    ? 'Employee resolved this with AI self-help'
+                    : ticket.self_help_resolved === false
+                    ? 'Self-help did not resolve this ticket'
+                    : 'Employee was shown self-help suggestions'
+                  }
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {ticket.self_help_resolved === true
+                    ? `They completed ${ticket.self_help_steps_done?.length ?? 0} step(s) and confirmed the issue is fixed. Ticket was auto-resolved — please verify with the employee as a safety check.`
+                    : ticket.self_help_resolved === false
+                    ? `They tried ${ticket.self_help_steps_done?.length ?? 0} step(s) but the issue persists. Please prioritise this ticket.`
+                    : 'The employee was shown AI self-help steps but has not yet reported an outcome.'
+                  }
+                </p>
+                {ticket.self_help_resolved === true && (
+                  <p className="text-xs text-green-400/70 mt-2 font-medium">
+                    Safety check: confirm with the employee that everything is working before closing.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Thread + Reply ──────────────────────────────────────────── */}
         <div className="card overflow-hidden">
           <div className="px-5 py-4 flex items-center gap-2" style={{ borderBottom: '1px solid var(--border)' }}>

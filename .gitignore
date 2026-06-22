@@ -41,3 +41,5 @@ logs/
 
 # Render
 .render-buildpacks.json
+
+backend/**/*.db

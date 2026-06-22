@@ -78,7 +78,9 @@ async def get_notifications(
         )
 
     elif role in AGENT_ROLES:
-        # Agents see employee replies on tickets assigned to them
+        # Agents see employee replies on tickets assigned to them directly
+        # OR routed to them via AI classification (ai_classification->routed_to_agent_id)
+        from sqlalchemy import or_, cast, String
         q = (
             select(TicketComment)
             .options(
@@ -87,8 +89,13 @@ async def get_notifications(
                 selectinload(TicketComment.ticket).selectinload(Ticket.department),
             )
             .join(Ticket, Ticket.id == TicketComment.ticket_id)
-            .where(Ticket.assigned_agent_id == current_user.id)
-            # only comments written by the employee (not self, not AI)
+            .where(
+                or_(
+                    Ticket.assigned_agent_id == current_user.id,
+                    # Also catch tickets routed via AI but assigned_agent_id not yet set
+                    cast(Ticket.ai_classification, String).contains(current_user.id),
+                )
+            )
             .where(TicketComment.author_id != current_user.id)
             .where(TicketComment.is_ai == False)
             .where(TicketComment.is_internal == False)

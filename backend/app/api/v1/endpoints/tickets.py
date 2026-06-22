@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
 
@@ -46,6 +46,10 @@ def _ticket_to_dict(t: Ticket) -> dict:
         "sla_deadline":    utc_iso(t.sla_deadline),
         "sla_breached":    t.sla_breached,
         "resolution_note": t.resolution_note,
+        "self_help_shown":      getattr(t, "self_help_shown", False),
+        "self_help_resolved":   getattr(t, "self_help_resolved", None),
+        "self_help_steps_done": getattr(t, "self_help_steps_done", None),
+        "self_help_outcome_at": utc_iso(getattr(t, "self_help_outcome_at", None)),
         "created_at":      utc_iso(t.created_at),
         "updated_at":      utc_iso(t.updated_at),
         "resolved_at":     utc_iso(t.resolved_at),
@@ -334,6 +338,124 @@ async def get_ai_reply(
     return {"reply": reply, "enabled": True}
 
 
+# ─── Self-Help Outcome Endpoint ───────────────────────────────────────────────
+
+@router.post("/{ticket_id}/self-help-outcome")
+async def report_self_help_outcome(
+    ticket_id:    str,
+    payload:      dict,
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db),
+):
+    """Employee reports whether self-help resolved their issue."""
+    result = await db.execute(
+        select(Ticket)
+        .options(selectinload(Ticket.assigned_agent))
+        .where(Ticket.id == ticket_id)
+    )
+    ticket = result.scalar_one_or_none()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    resolved    = payload.get("resolved", False)       # bool
+    steps_done  = payload.get("steps_done", [])        # list of step order ints
+
+    from app.models.models import utcnow, TicketStatus, AuditLog
+    ticket.self_help_shown      = True
+    ticket.self_help_resolved   = resolved
+    ticket.self_help_steps_done = steps_done
+    ticket.self_help_outcome_at = utcnow()
+
+    if resolved:
+        # Auto-close: set to resolved, add a system comment, log it
+        ticket.status      = TicketStatus.resolved
+        ticket.resolved_at = utcnow()
+        ticket.resolution_note = "Resolved by employee using AI self-help suggestions."
+
+        # System comment visible to agent
+        from app.models.models import TicketComment
+        bot_comment = TicketComment(
+            ticket_id   = ticket_id,
+            author_id   = current_user.id,
+            content     = (
+                "Self-help resolved this ticket.\n\n"
+                f"The employee confirmed the AI self-help steps fixed their issue "
+                f"({len(steps_done)} of the suggested steps were completed).\n\n"
+                "The ticket has been automatically resolved. "
+                "Please verify with the employee that everything is working correctly "
+                "as a final safety check."
+            ),
+            is_internal = True,
+            is_ai       = True,
+        )
+        db.add(bot_comment)
+
+        db.add(AuditLog(
+            ticket_id = ticket_id,
+            user_id   = current_user.id,
+            action    = "self_help_resolved",
+            details   = {"steps_done": steps_done, "auto_closed": True},
+        ))
+    else:
+        from app.models.models import TicketComment, TicketStatus as TS
+        from sqlalchemy import select as sa_select
+
+        # Ensure ticket has an assigned agent — if not, look up from ai_classification
+        if not ticket.assigned_agent_id:
+            routed_id = (ticket.ai_classification or {}).get("routed_to_agent_id")
+            if routed_id:
+                ticket.assigned_agent_id = routed_id
+                ticket.status = TS.assigned
+                await db.flush()
+
+        # Move to in_progress so it's clearly active for the agent
+        if ticket.status in (TS.open, TS.pending, TS.assigned):
+            ticket.status = TS.in_progress
+
+        # Public comment authored by employee — this is what triggers
+        # the agent notification query (employee comment on assigned ticket)
+        bot_comment = TicketComment(
+            ticket_id   = ticket_id,
+            author_id   = current_user.id,
+            content     = (
+                f"I tried {len(steps_done)} self-help step(s) suggested by the AI "
+                "but the issue is still not resolved. "
+                "Please could you assist — I need help with this ticket."
+            ),
+            is_internal = False,
+            is_ai       = False,
+        )
+        db.add(bot_comment)
+
+        # Internal note — extra context visible only to agents/admins
+        internal_note = TicketComment(
+            ticket_id   = ticket_id,
+            author_id   = current_user.id,
+            content     = (
+                "Self-help did not resolve this ticket.\n\n"
+                f"The employee tried {len(steps_done)} self-help step(s) but the issue persists. "
+                "They've already attempted the basics — please skip those and investigate further."
+            ),
+            is_internal = True,
+            is_ai       = True,
+        )
+        db.add(internal_note)
+
+        db.add(AuditLog(
+            ticket_id = ticket_id,
+            user_id   = current_user.id,
+            action    = "self_help_not_resolved",
+            details   = {"steps_done": steps_done, "assigned_agent_id": ticket.assigned_agent_id},
+        ))
+
+    await db.commit()
+    return {
+        "success":    True,
+        "resolved":   resolved,
+        "auto_closed": resolved,
+    }
+
+
 # ─── Automated Response Endpoints ─────────────────────────────────────────────
 
 from app.services.ai.response_service import generate_auto_response, generate_all_tones
@@ -412,10 +534,25 @@ async def auto_response_all_tones(
 @router.get("/{ticket_id}/self-help")
 async def get_self_help(
     ticket_id:    str,
+    regenerate:   bool = Query(False),
     current_user: User = Depends(get_current_user),
     db:           AsyncSession = Depends(get_db),
 ):
-    """Return AI-generated self-help steps for the employee to try while waiting."""
+    """
+    Return AI-generated self-help steps for the employee to try while waiting.
+
+    The generated content is cached on the ticket (self_help_content) the
+    first time it's produced, so reopening the ticket later shows the exact
+    same steps instead of a freshly regenerated set — otherwise "step 3 was
+    checked off" stops meaning anything once the wording/order changes.
+    Persisted progress (which steps were checked, and the resolved/not
+    outcome if one was already submitted) is returned alongside the content
+    so the panel can restore exactly where the employee left off.
+
+    Pass ?regenerate=true (the panel's "refresh" button) to force a new set
+    of steps — this also clears any previously checked steps/outcome, since
+    they no longer correspond to the new step list.
+    """
     result = await db.execute(
         select(Ticket).options(selectinload(Ticket.department)).where(Ticket.id == ticket_id)
     )
@@ -428,18 +565,62 @@ async def get_self_help(
     if not settings_cfg.get("self_help", True):
         return {"enabled": False}
 
-    ai       = ticket.ai_classification or {}
-    dept     = ticket.department.name if ticket.department else "Support"
-    category = ai.get("category", "General Support")
-    priority = ticket.priority.value if hasattr(ticket.priority, "value") else str(ticket.priority)
+    if ticket.self_help_content and not regenerate:
+        content = dict(ticket.self_help_content)
+    else:
+        ai       = ticket.ai_classification or {}
+        dept     = ticket.department.name if ticket.department else "Support"
+        category = ai.get("category", "General Support")
+        priority = ticket.priority.value if hasattr(ticket.priority, "value") else str(ticket.priority)
 
-    from app.services.ai.response_service import generate_self_help
-    result = await generate_self_help(
-        title       = ticket.title,
-        description = ticket.description,
-        category    = category,
-        department  = dept,
-        priority    = priority,
-    )
-    result["enabled"] = True
-    return result
+        from app.services.ai.response_service import generate_self_help
+        content = await generate_self_help(
+            title       = ticket.title,
+            description = ticket.description,
+            category    = category,
+            department  = dept,
+            priority    = priority,
+        )
+        ticket.self_help_content = content
+        ticket.self_help_shown   = True
+        if regenerate:
+            # Old progress doesn't correspond to the new step list anymore.
+            ticket.self_help_steps_done = []
+            ticket.self_help_resolved   = None
+        await db.flush()
+
+    content["enabled"]    = True
+    content["steps_done"] = ticket.self_help_steps_done or []
+    content["resolved"]   = ticket.self_help_resolved
+    return content
+
+
+class SelfHelpProgressRequest(BaseModel):
+    steps_done: List[int]
+
+
+@router.patch("/{ticket_id}/self-help-progress")
+async def save_self_help_progress(
+    ticket_id:    str,
+    req:          SelfHelpProgressRequest,
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db),
+):
+    """
+    Persist which self-help steps are checked off as the employee ticks them,
+    independent of submitting a final resolved/not-resolved outcome — so
+    progress survives navigating away and back even before they've decided
+    whether the steps actually fixed things.
+    """
+    result = await db.execute(select(Ticket).where(Ticket.id == ticket_id))
+    ticket = result.scalar_one_or_none()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    if ticket.submitted_by_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the ticket submitter can update self-help progress")
+
+    ticket.self_help_steps_done = req.steps_done
+    ticket.self_help_shown      = True
+    await db.flush()
+    return {"steps_done": ticket.self_help_steps_done}
