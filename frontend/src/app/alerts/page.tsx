@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import Link from 'next/link'
-import { buildAlertItems, getReadIds, markRead as markReadShared, markAllRead as markAllReadShared, AlertItem as SharedAlertItem } from '@/lib/alerts'
+import { buildAlertItems, getReadIds, markRead as markReadShared, markAllRead as markAllReadShared, AlertItem as SharedAlertItem, AlertType } from '@/lib/alerts'
 import { isToday, isYesterday, format } from 'date-fns'
 
 type FilterKey = 'all' | 'messages' | 'escalated' | 'sla' | 'critical'
@@ -112,7 +112,10 @@ export default function AlertsPage() {
     setAlerts(prev => prev.map(a => ids.includes(a.id) ? { ...a, read: true } : a))
   }
 
-  const filtered = filter === 'all' ? alerts : alerts.filter(a => a.type === filter)
+  const filter_type_map: Record<FilterKey, AlertType | null> = {
+    all: null, messages: 'message', escalated: 'escalated', sla: 'sla', critical: 'critical',
+  }
+  const filtered = filter === 'all' ? alerts : alerts.filter(a => a.type === filter_type_map[filter])
   const unreadCount = filtered.filter(a => !a.read).length
   const counts = {
     all:       alerts.length,

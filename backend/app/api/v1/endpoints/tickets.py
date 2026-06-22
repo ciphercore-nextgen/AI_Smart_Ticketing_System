@@ -33,6 +33,25 @@ def utc_iso(dt) -> "str | None":
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
 
+def _is_sla_breached(t: Ticket) -> bool:
+    """
+    The stored sla_breached column is set once at creation (always False) and
+    nothing ever flips it — there's no background job in this app to revisit
+    it as time passes. Compute it live instead: breached if the deadline has
+    passed and the ticket isn't already resolved/closed.
+    """
+    if t.sla_breached:
+        return True
+    if not t.sla_deadline:
+        return False
+    status = t.status.value if hasattr(t.status, "value") else str(t.status)
+    if status in ("resolved", "closed"):
+        return False
+    deadline = t.sla_deadline
+    now = datetime.now(timezone.utc).replace(tzinfo=None) if deadline.tzinfo is None else datetime.now(timezone.utc)
+    return deadline < now
+
+
 def _ticket_to_dict(t: Ticket) -> dict:
     ai = t.ai_classification or {}
     return {
@@ -44,7 +63,7 @@ def _ticket_to_dict(t: Ticket) -> dict:
         "priority":        t.priority.value if hasattr(t.priority, "value") else str(t.priority),
         "is_escalated":    t.is_escalated,
         "sla_deadline":    utc_iso(t.sla_deadline),
-        "sla_breached":    t.sla_breached,
+        "sla_breached":    _is_sla_breached(t),
         "resolution_note": t.resolution_note,
         "self_help_shown":      getattr(t, "self_help_shown", False),
         "self_help_resolved":   getattr(t, "self_help_resolved", None),

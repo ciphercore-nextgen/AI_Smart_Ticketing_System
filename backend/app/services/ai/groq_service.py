@@ -224,46 +224,51 @@ Respond ONLY with valid JSON:
 
 async def classify_ticket(title: str, description: str) -> dict:
     if not settings.GROQ_API_KEY or settings.GROQ_API_KEY.startswith("gsk_your"):
-        return _fallback_classify(title, description)
+        result = _fallback_classify(title, description)
+    else:
+        try:
+            groq = get_groq_client()
+            response = await groq.chat.completions.create(
+                model=settings.GROQ_CLASSIFICATION_MODEL,
+                messages=[
+                    {"role": "system", "content": CLASSIFICATION_PROMPT},
+                    {"role": "user",   "content": f"Title: {title}\n\nDescription: {description}"},
+                ],
+                temperature=0.05,
+                max_tokens=600,
+                response_format={"type": "json_object"},
+            )
 
-    try:
-        groq = get_groq_client()
-        response = await groq.chat.completions.create(
-            model=settings.GROQ_CLASSIFICATION_MODEL,
-            messages=[
-                {"role": "system", "content": CLASSIFICATION_PROMPT},
-                {"role": "user",   "content": f"Title: {title}\n\nDescription: {description}"},
-            ],
-            temperature=0.05,
-            max_tokens=600,
-            response_format={"type": "json_object"},
-        )
+            result = json.loads(response.choices[0].message.content)
 
-        result = json.loads(response.choices[0].message.content)
+            valid_slugs = {"hr", "it", "finance", "operations"}
+            if result.get("department_slug") not in valid_slugs:
+                result["department_slug"] = _keyword_dept(title + " " + description)
+                result["department_name"] = {
+                    "hr": "Human Resources", "it": "Information Technology",
+                    "finance": "Finance", "operations": "Operations",
+                }.get(result["department_slug"], "Information Technology")
 
-        valid_slugs = {"hr", "it", "finance", "operations"}
-        if result.get("department_slug") not in valid_slugs:
-            result["department_slug"] = _keyword_dept(title + " " + description)
-            result["department_name"] = {
-                "hr": "Human Resources", "it": "Information Technology",
-                "finance": "Finance", "operations": "Operations",
-            }.get(result["department_slug"], "Information Technology")
+            if result.get("priority") not in {"critical", "high", "medium", "low"}:
+                result["priority"] = "medium"
 
-        if result.get("priority") not in {"critical", "high", "medium", "low"}:
-            result["priority"] = "medium"
+            if not isinstance(result.get("skill_tokens"), list):
+                result["skill_tokens"] = _extract_fallback_tokens(title + " " + description)
 
-        if not isinstance(result.get("skill_tokens"), list):
-            result["skill_tokens"] = _extract_fallback_tokens(title + " " + description)
+            if not isinstance(result.get("token_weights"), dict):
+                result["token_weights"] = {t: 2 for t in result["skill_tokens"]}
 
-        if not isinstance(result.get("token_weights"), dict):
-            result["token_weights"] = {t: 2 for t in result["skill_tokens"]}
+            result["classified_by"] = "groq_tokenized"
 
-        result["classified_by"] = "groq_tokenized"
-        return result
+        except Exception as e:
+            print(f"[GROQ Stage1] Classification failed: {e}")
+            result = _fallback_classify(title, description)
 
-    except Exception as e:
-        print(f"[GROQ Stage1] Classification failed: {e}")
-        return _fallback_classify(title, description)
+    # Applies regardless of which path produced `result` — the AI (or its
+    # fallback) might miss explicit urgency language the employee used, so
+    # this is a deterministic safety net on top, not a replacement for it.
+    _apply_urgency_override(title, description, result)
+    return result
 
 
 async def select_agent_for_ticket(
@@ -414,6 +419,12 @@ _IT_HARD_SIGNALS = [
     "device", "phone", "mobile", "tablet", "headset", "webcam",
     "slow computer", "slow laptop", "slow pc", "computer crash",
     "laptop crash", "pc crash", "system crash",
+    # Common office hardware that was previously missing — these are exactly
+    # the kind of ticket that should never need an AI call to route correctly.
+    "projector", "tv", "television", "hdmi", "vga", "av equipment",
+    "audio visual", "conference room", "meeting room", "speaker",
+    "microphone", "mic ", "router", "cable", "charger", "dock",
+    "docking station", "adapter", "extension cord", "power strip",
 ]
 
 _AI_TOOL_HARD_SIGNALS = [
@@ -651,6 +662,63 @@ def _extract_fallback_tokens(text: str) -> list[str]:
         return ["report", "data_analysis", "analytics"]
     else:
         return ["password", "access", "system"]
+
+
+_PRIORITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+
+# General time-pressure language — "I need this badly/soon" — bumps to at
+# least HIGH. This is about urgency the employee is expressing, not
+# necessarily severity of impact, so it doesn't jump all the way to critical.
+_URGENCY_HIGH_SIGNALS = [
+    "urgently", "urgent", "asap", "as soon as possible", "need help fast",
+    "need this fast", "need this now", "need it now", "need this asap",
+    "i need to submit now", "need to submit urgently", "right away",
+    "right now", "immediately", "time sensitive", "time-sensitive",
+    "running out of time", "deadline today", "deadline is today",
+    "deadline is in", "due today", "due in", "can't wait", "cannot wait",
+    "won't wait", "please hurry", "hurry", "quickly please", "fast as possible",
+]
+
+# Severity-of-impact language — work is actually blocked, or something is
+# actively broken/at risk — bumps all the way to CRITICAL.
+_URGENCY_CRITICAL_SIGNALS = [
+    "emergency", "system is down", "systems down", "production down",
+    "production is down", "site is down", "completely down", "totally down",
+    "data loss", "losing data", "lost data", "security breach", "data breach",
+    "been hacked", "ransomware", "completely blocked", "totally blocked",
+    "cannot work at all", "can't work at all", "dead in the water",
+    "everyone is affected", "entire team is blocked", "whole team is blocked",
+    "business critical", "mission critical",
+]
+
+
+def _apply_urgency_override(title: str, description: str, result: dict) -> None:
+    """
+    Mutates result["priority"] in place — bumps it up (never down) when the
+    employee's own wording signals urgency the classifier may have missed,
+    e.g. "I need this fixed urgently" or "I need to submit this now".
+
+    Deliberately a plain substring check, same philosophy as the agent
+    routing override: cheap, deterministic, and works even if the AI call
+    failed entirely and we're on the keyword fallback.
+    """
+    text = (title + " " + description).lower()
+    current = result.get("priority", "medium")
+    current_rank = _PRIORITY_ORDER.get(current, 1)
+
+    target = None
+    if any(sig in text for sig in _URGENCY_CRITICAL_SIGNALS):
+        target = "critical"
+    elif any(sig in text for sig in _URGENCY_HIGH_SIGNALS):
+        target = "high"
+
+    if target and _PRIORITY_ORDER[target] > current_rank:
+        result["priority"] = target
+        result["priority_reason"] = (
+            f"{result.get('priority_reason', '')} "
+            f"[Bumped to {target} — employee's wording signals urgency]"
+        ).strip()
+        result["urgency_override"] = True
 
 
 def _fallback_classify(title: str, description: str) -> dict:
