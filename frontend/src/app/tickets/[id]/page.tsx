@@ -464,7 +464,7 @@ export default function TicketDetailPage() {
         </div>
 
         {/* Self-help panel */}
-        <SelfHelpPanel ticketId={id} autoLoad={!isAgentOrAdmin} />
+        <SelfHelpPanel ticketId={id} autoLoad={!isAgentOrAdmin} readOnly={isAgentOrAdmin} />
 
         {/* Self-help outcome banner — agents only */}
         {isAgentOrAdmin && ticket.self_help_shown && (

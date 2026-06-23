@@ -10,7 +10,7 @@
  * store.
  */
 
-export type AlertType = 'message' | 'escalated' | 'sla' | 'critical'
+export type AlertType = 'message' | 'escalated' | 'sla' | 'critical' | 'assigned'
 
 export interface AlertItem {
   id:           string
@@ -63,9 +63,17 @@ export const markAllRead = (ids: string[]) => {
 }
 
 // ── Building the alert list from raw API data ───────────────────────────────
-export function buildAlertItems(tickets: any[], notifs: any[]): AlertItem[] {
+// currentUserId is optional — when provided (agents/admins), tickets newly
+// assigned to that specific person also surface as alerts. Previously there
+// was NO signal at all when AI routing assigned a ticket to an agent — they
+// only found out by manually checking their queue.
+export function buildAlertItems(tickets: any[], notifs: any[], currentUserId?: string): AlertItem[] {
   const sysAlerts: AlertItem[] = tickets.flatMap((t) => {
     const items: AlertItem[] = []
+    if (currentUserId && t.assigned_agent?.id === currentUserId)
+      items.push({ id: `asg-${t.id}`, type: 'assigned', time: t.created_at,
+        ticketId: t.id, ticketNumber: t.ticket_number, ticketTitle: t.title,
+        department: t.department?.name, systemMsg: 'New ticket assigned to you' })
     if (t.is_escalated)
       items.push({ id: `esc-${t.id}`, type: 'escalated', time: t.updated_at,
         ticketId: t.id, ticketNumber: t.ticket_number, ticketTitle: t.title,
@@ -103,6 +111,7 @@ export function buildAlertItems(tickets: any[], notifs: any[]): AlertItem[] {
 export async function fetchAlertSummary(
   ticketsApi: { list: (params?: any) => Promise<any> },
   notificationsApi: { list: (since?: string) => Promise<any> },
+  currentUserId?: string,
 ): Promise<{ items: AlertItem[]; unreadCount: number }> {
   const [ticketRes, notifRes] = await Promise.all([
     ticketsApi.list(),
@@ -110,7 +119,7 @@ export async function fetchAlertSummary(
   ])
   const tickets: any[] = ticketRes.data.tickets || []
   const notifs:  any[] = notifRes.data.notifications || []
-  const items = buildAlertItems(tickets, notifs)
+  const items = buildAlertItems(tickets, notifs, currentUserId)
   const readIds = getReadIds()
   const unreadCount = items.filter(i => !readIds.has(i.id)).length
   return { items, unreadCount }

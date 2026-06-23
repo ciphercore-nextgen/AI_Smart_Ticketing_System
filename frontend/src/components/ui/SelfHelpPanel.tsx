@@ -42,9 +42,13 @@ type OutcomeState = 'idle' | 'submitting' | 'resolved' | 'not_resolved'
 interface Props {
   ticketId: string
   autoLoad?: boolean
+  /** Agents/admins can see exactly what the employee tried, but can't
+   *  check/uncheck steps or submit an outcome on someone else's behalf —
+   *  this is a verification view, not an interactive one. */
+  readOnly?: boolean
 }
 
-export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
+export default function SelfHelpPanel({ ticketId, autoLoad = false, readOnly = false }: Props) {
   const [open,    setOpen]    = useState(autoLoad)
   const [data,    setData]    = useState<SelfHelpData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -77,7 +81,7 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
   }
 
   const toggleStep = (order: number) => {
-    if (outcome !== 'idle') return
+    if (readOnly || outcome !== 'idle') return
     setChecked(prev => {
       const next = new Set(prev)
       next.has(order) ? next.delete(order) : next.add(order)
@@ -169,42 +173,59 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                 </div>
               )}
 
-              {/* Resolved outcome */}
+              {/* Resolved outcome — compact banner, steps stay visible below */}
               {outcome === 'resolved' && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.97 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="rounded-xl bg-green-500/5 border border-green-500/25 p-5 text-center"
-                >
-                  <CheckCircle className="w-10 h-10 text-green-400 mx-auto mb-3" />
-                  <p className="text-base font-semibold text-green-300">Glad it worked!</p>
-                  <p className="text-sm text-gray-400 mt-1">
-                    Your ticket has been automatically resolved. An agent will do a quick
-                    check to confirm everything is working correctly.
+                <div className="rounded-lg bg-green-500/5 border border-green-500/25 p-3 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
+                  <p className="text-sm text-green-300">
+                    {readOnly
+                      ? 'Employee reported this as fixed via self-help.'
+                      : "Glad it worked! Your ticket has been automatically resolved."}
                   </p>
-                </motion.div>
+                </div>
               )}
 
-              {/* Not resolved outcome */}
+              {/* Not resolved outcome — compact banner, steps stay visible below */}
               {outcome === 'not_resolved' && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.97 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="rounded-xl bg-blue-500/5 border border-blue-500/25 p-5 text-center"
-                >
-                  <Lightbulb className="w-10 h-10 text-blue-400 mx-auto mb-3" />
-                  <p className="text-base font-semibold text-blue-300">We've got you</p>
-                  <p className="text-sm text-gray-400 mt-1">
-                    Your agent has been notified that you tried the self-help steps and
-                    the issue persists. They'll prioritise your ticket.
+                <div className="rounded-lg bg-blue-500/5 border border-blue-500/25 p-3 flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                  <p className="text-sm text-blue-300">
+                    {readOnly
+                      ? 'Employee tried these steps but the issue persists.'
+                      : "We've got you — your agent has been notified and will prioritise this."}
                   </p>
-                </motion.div>
+                </div>
               )}
 
-              {/* Main content */}
-              {data && data.enabled !== false && outcome === 'idle' && (
+              {/* Agent-facing caution: outcome was "fixed" but they didn't try
+                  everything — could be a band-aid on a deeper problem. */}
+              {readOnly && outcome === 'resolved' && totalSteps > 0 && completedCount < totalSteps && (
+                <div className="flex items-start gap-2 bg-orange-500/5 border border-orange-500/20 rounded-lg p-3">
+                  <ShieldAlert className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-orange-300 leading-relaxed">
+                    Employee only tried <strong>{completedCount} of {totalSteps}</strong> suggested steps before
+                    reporting it fixed — worth a quick check that this addresses the actual cause and
+                    isn't just a temporary workaround (e.g. a restart that masks a recurring issue).
+                  </p>
+                </div>
+              )}
+
+              {readOnly && data && data.enabled !== false && totalSteps > 0 && outcome === 'idle' && (
+                <div className="flex items-center gap-2 bg-gray-800/40 border border-gray-700/40 rounded-lg px-3 py-2">
+                  <Circle className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                  <p className="text-xs text-gray-400">
+                    Employee hasn't reported an outcome yet — {completedCount}/{totalSteps} steps checked so far.
+                  </p>
+                </div>
+              )}
+
+              {/* Main content — steps stay visible regardless of outcome, so
+                  the agent (and the employee, looking back) can always see
+                  exactly what was tried, not just the final yes/no. */}
+              {data && data.enabled !== false && (
                 <>
-                  {/* Summary + confidence */}
+                  {/* Summary + confidence — only relevant before an outcome exists */}
+                  {outcome === 'idle' && (
                   <div className="flex items-start gap-3">
                     <div className="flex-1">
                       <p className="text-sm text-gray-300 leading-relaxed">{data.summary ?? ''}</p>
@@ -226,14 +247,17 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                         )}
                       </div>
                     </div>
-                    <button
-                      onClick={() => { setData(null); setOutcome('idle'); load(true) }}
-                      className="text-gray-600 hover:text-gray-400 transition flex-shrink-0"
-                      title="Regenerate"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                    </button>
+                    {!readOnly && (
+                      <button
+                        onClick={() => { setData(null); setOutcome('idle'); load(true) }}
+                        className="text-gray-600 hover:text-gray-400 transition flex-shrink-0"
+                        title="Regenerate"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
+                  )}
 
                   {/* Likely solution */}
                   {data.likely_solution && (
@@ -260,24 +284,25 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                   {/* Steps */}
                   <div className="space-y-2">
                     {(data.steps ?? []).map((step) => {
-                      const done    = checked.has(step.order)
-                      const riskCfg = RISK_CONFIG[step.risk] || RISK_CONFIG.none
+                      const done       = checked.has(step.order)
+                      const interactive = !readOnly && outcome === 'idle'
+                      const riskCfg    = RISK_CONFIG[step.risk] || RISK_CONFIG.none
                       return (
                         <motion.div
                           key={step.order}
                           layout
-                          className={`rounded-lg border p-3 transition cursor-pointer ${
+                          className={`rounded-lg border p-3 transition ${interactive ? 'cursor-pointer' : 'cursor-default'} ${
                             done
                               ? 'bg-green-500/5 border-green-500/20 opacity-70'
-                              : 'bg-gray-900/50 border-gray-800/60 hover:border-amber-500/20'
+                              : `bg-gray-900/50 border-gray-800/60 ${interactive ? 'hover:border-amber-500/20' : ''}`
                           }`}
-                          onClick={() => toggleStep(step.order)}
+                          onClick={() => interactive && toggleStep(step.order)}
                         >
                           <div className="flex items-start gap-3">
                             <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 mt-0.5 transition ${
                               done
                                 ? 'bg-green-500 border-green-500'
-                                : 'border-gray-600 hover:border-amber-400'
+                                : `border-gray-600 ${interactive ? 'hover:border-amber-400' : ''}`
                             }`}>
                               {done
                                 ? <CheckCircle className="w-3.5 h-3.5 text-white" />
@@ -356,8 +381,8 @@ export default function SelfHelpPanel({ ticketId, autoLoad = false }: Props) {
                     </div>
                   )}
 
-                  {/* ── Outcome question ── */}
-                  {completedCount > 0 && (
+                  {/* ── Outcome question — employee only, before they've answered ── */}
+                  {!readOnly && outcome === 'idle' && completedCount > 0 && (
                     <motion.div
                       initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}

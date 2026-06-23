@@ -14,7 +14,7 @@ import Link from 'next/link'
 import { buildAlertItems, getReadIds, markRead as markReadShared, markAllRead as markAllReadShared, AlertItem as SharedAlertItem, AlertType } from '@/lib/alerts'
 import { isToday, isYesterday, format } from 'date-fns'
 
-type FilterKey = 'all' | 'messages' | 'escalated' | 'sla' | 'critical'
+type FilterKey = 'all' | 'messages' | 'escalated' | 'sla' | 'critical' | 'assigned'
 
 interface AlertItem extends SharedAlertItem {
   read: boolean
@@ -59,7 +59,7 @@ export default function AlertsPage() {
       const notifs:  any[] = notifRes.data.notifications || []
       const stored = getReadIds()
 
-      const all: AlertItem[] = buildAlertItems(tickets, notifs)
+      const all: AlertItem[] = buildAlertItems(tickets, notifs, user?.id)
         .map(item => ({ ...item, read: stored.has(item.id) }))
 
       setAlerts(all)
@@ -113,7 +113,7 @@ export default function AlertsPage() {
   }
 
   const filter_type_map: Record<FilterKey, AlertType | null> = {
-    all: null, messages: 'message', escalated: 'escalated', sla: 'sla', critical: 'critical',
+    all: null, messages: 'message', escalated: 'escalated', sla: 'sla', critical: 'critical', assigned: 'assigned',
   }
   const filtered = filter === 'all' ? alerts : alerts.filter(a => a.type === filter_type_map[filter])
   const unreadCount = filtered.filter(a => !a.read).length
@@ -123,6 +123,7 @@ export default function AlertsPage() {
     escalated: alerts.filter(a => a.type === 'escalated').length,
     sla:       alerts.filter(a => a.type === 'sla').length,
     critical:  alerts.filter(a => a.type === 'critical').length,
+    assigned:  alerts.filter(a => a.type === 'assigned').length,
   }
 
   const TYPE_CFG = {
@@ -130,10 +131,12 @@ export default function AlertsPage() {
     escalated: { icon: AlertTriangle, color: 'var(--danger)',  bg: 'var(--danger-bg)',      border: 'color-mix(in srgb, var(--danger) 25%, transparent)'  },
     sla:       { icon: Clock,         color: 'var(--warning)', bg: 'var(--warning-bg)',     border: 'color-mix(in srgb, var(--warning) 25%, transparent)' },
     critical:  { icon: Zap,           color: '#f59e0b',        bg: 'rgba(245,158,11,.08)',  border: 'rgba(245,158,11,.25)'                                },
+    assigned:  { icon: User,          color: '#a78bfa',        bg: 'rgba(167,139,250,.08)', border: 'rgba(167,139,250,.25)'                               },
   }
 
   const TABS: [FilterKey, string][] = [
     ['all',       'All'],
+    ['assigned',  'Assigned to me'],
     ['messages',  'Messages'],
     ['escalated', 'Escalated'],
     ['sla',       'SLA Breach'],
@@ -147,7 +150,7 @@ export default function AlertsPage() {
       <div className="space-y-4" style={{ maxWidth: 720 }}>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-6 gap-2">
           {TABS.map(([key, label]) => {
             const cfg    = key === 'all' ? null : TYPE_CFG[key as keyof typeof TYPE_CFG]
             const active = filter === key

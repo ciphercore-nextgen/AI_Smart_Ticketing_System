@@ -26,10 +26,10 @@ export default function Header({ title, subtitle }: HeaderProps) {
   // (opened an item, marked all read, a new alert arrived, etc.).
   const refreshUnread = useCallback(async () => {
     try {
-      const { unreadCount } = await fetchAlertSummary(ticketsApi, notificationsApi)
+      const { unreadCount } = await fetchAlertSummary(ticketsApi, notificationsApi, user?.id)
       setUnread(unreadCount)
     } catch { /* silent */ }
-  }, [])
+  }, [user?.id])
 
   useEffect(() => { refreshUnread() }, [])   // eslint-disable-line
 
