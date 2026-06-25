@@ -155,7 +155,7 @@ from pathlib import Path
 SETTINGS_FILE = Path(__file__).resolve().parents[4] / "data" / "settings.json"
 
 DEFAULT_SETTINGS = {
-    "groq_model":   "llama3-8b-8192",
+    "groq_model":   "openai/gpt-oss-20b",
     "auto_reply":   True,
     "self_help":    True,
     "tone_default": "formal",

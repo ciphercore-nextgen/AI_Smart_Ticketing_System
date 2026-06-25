@@ -16,7 +16,7 @@ export default function SettingsPage() {
   const [saved,    setSaved]    = useState(false)
   const [now,      setNow]      = useState(new Date())
 
-  const [groqModel,   setGroqModel]   = useState('llama3-8b-8192')
+  const [groqModel,   setGroqModel]   = useState('openai/gpt-oss-20b')
   const [autoReply,   setAutoReply]   = useState(true)
   const [selfHelp,    setSelfHelp]    = useState(true)
   const [toneDefault, setToneDefault] = useState('formal')
@@ -127,9 +127,8 @@ export default function SettingsPage() {
               GROQ Model
             </label>
             <select value={groqModel} onChange={e => setGroqModel(e.target.value)} className="input" style={{ height: 36, fontSize: 13 }}>
-              <option value="llama3-8b-8192">LLaMA 3 · 8B  —  Fast (recommended)</option>
-              <option value="llama3-70b-8192">LLaMA 3 · 70B  —  More powerful</option>
-              <option value="mixtral-8x7b-32768">Mixtral 8x7B  —  Long context</option>
+              <option value="openai/gpt-oss-20b">GPT-OSS · 20B  —  Fast (recommended)</option>
+              <option value="openai/gpt-oss-120b">GPT-OSS · 120B  —  More powerful</option>
             </select>
           </div>
           <Toggle label="Automated First Response"

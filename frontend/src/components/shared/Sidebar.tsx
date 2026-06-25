@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Ticket, BarChart3, Users, Settings,
-  LogOut, Building2, Plus, Bell, Shield,
+  LogOut, Building2, Plus, Bell, Shield, FileText,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { authApi } from '@/lib/api'
@@ -41,6 +41,7 @@ const navByRole: Record<string, { href: string; icon: any; label: string }[]> = 
     { href: '/admin/users',       icon: Users,           label: 'Users' },
     { href: '/admin/departments', icon: Building2,       label: 'Departments' },
     { href: '/analytics/admin',   icon: BarChart3,       label: 'Analytics' },
+    { href: '/admin/reports',     icon: FileText,        label: 'Reports' },
     { href: '/alerts',            icon: Bell,            label: 'Alerts' },
     { href: '/admin/settings',    icon: Settings,        label: 'Settings' },
   ],
@@ -50,6 +51,7 @@ const navByRole: Record<string, { href: string; icon: any; label: string }[]> = 
     { href: '/admin/users',       icon: Users,           label: 'Users' },
     { href: '/admin/departments', icon: Building2,       label: 'Departments' },
     { href: '/analytics/admin',   icon: BarChart3,       label: 'Analytics' },
+    { href: '/admin/reports',     icon: FileText,        label: 'Reports' },
     { href: '/alerts',            icon: Bell,            label: 'Alerts' },
     { href: '/admin/settings',    icon: Settings,        label: 'Settings' },
   ],

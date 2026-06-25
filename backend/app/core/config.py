@@ -18,8 +18,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama3-8b-8192"
-    GROQ_CLASSIFICATION_MODEL: str = "llama3-8b-8192"
+    GROQ_MODEL: str = "openai/gpt-oss-20b"
+    GROQ_CLASSIFICATION_MODEL: str = "openai/gpt-oss-20b"
     APP_ENV: str = "development"
     CORS_ORIGINS: str = "http://localhost:3000"
 

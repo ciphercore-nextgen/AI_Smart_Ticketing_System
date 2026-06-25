@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.session import init_db
-from app.api.v1.endpoints import auth, tickets, analytics, admin, notifications
+from app.api.v1.endpoints import auth, tickets, analytics, admin, notifications, reports, reports
 
 app = FastAPI(
     title="TicketIQ Enterprise API",
@@ -25,6 +25,8 @@ app.include_router(tickets.router,   prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(admin.router,         prefix="/api/v1")
 app.include_router(notifications.router, prefix="/api/v1")
+app.include_router(reports.router,       prefix="/api/v1")
+app.include_router(reports.router,       prefix="/api/v1")
 
 
 @app.on_event("startup")

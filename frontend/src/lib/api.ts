@@ -117,6 +117,16 @@ export const analyticsApi = {
   byStatus:      () => api.get('/analytics/by-status'),
 }
 
+// ─── Reports ──────────────────────────────────────────────────────────────────
+export const reportsApi = {
+  weeklySummary: (department = 'all', days = 7) =>
+    api.get(`/reports/weekly-summary?department=${department}&days=${days}`),
+  // responseType 'blob' so the auth interceptor still attaches the bearer
+  // token (a plain <a href> to the API wouldn't carry it)
+  weeklySummaryPdf: (department = 'all', days = 7) =>
+    api.get(`/reports/weekly-summary/pdf?department=${department}&days=${days}`, { responseType: 'blob' }),
+}
+
 // ─── Notifications ────────────────────────────────────────────────────────────
 export const notificationsApi = {
   list: (since?: string) =>
