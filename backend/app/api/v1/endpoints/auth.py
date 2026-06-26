@@ -50,6 +50,7 @@ def _user_to_dict(user: User) -> dict:
         "office_location":      user.office_location,
         "avatar_url":           user.avatar_url,
         "permissions":          user.permissions or [],
+        "can_approve":          getattr(user, "can_approve", False),
     }
 
 

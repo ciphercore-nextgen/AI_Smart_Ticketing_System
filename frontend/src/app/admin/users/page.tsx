@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/shared/DashboardLayout'
 import { adminApi } from '@/lib/api'
-import { Users, Search, RefreshCw, Cpu, Monitor, Workflow, Shield, User } from 'lucide-react'
+import { Users, Search, RefreshCw, Cpu, Monitor, Workflow, Shield, User, ShieldCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const ROLE_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
@@ -39,6 +39,15 @@ export default function UsersPage() {
   const employees = filtered.filter(u => u.role === 'employee')
   const admins    = filtered.filter(u => ['admin','super_admin'].includes(u.role))
 
+  const toggleApprove = async (u: any) => {
+    try {
+      await adminApi.updateUser(u.id, { can_approve: !u.can_approve })
+      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, can_approve: !x.can_approve } : x))
+    } catch {
+      toast.error('Could not update approval authority')
+    }
+  }
+
   const UserCard = ({ u }: { u: any }) => {
     const cfg  = ROLE_CONFIG[u.role] || ROLE_CONFIG.employee
     const Icon = cfg.icon
@@ -53,6 +62,17 @@ export default function UsersPage() {
           <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{u.full_name}</p>
           <p className="text-xs truncate" style={{ color: 'var(--text-3)' }}>{u.email}</p>
         </div>
+        <button
+          onClick={() => toggleApprove(u)}
+          title="Toggle approval authority (manager sign-off for the approval workflow)"
+          className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full flex-shrink-0 transition"
+          style={u.can_approve
+            ? { background: 'rgba(245,158,11,.12)', color: '#f59e0b' }
+            : { background: 'var(--bg-2)', color: 'var(--text-3)' }}
+        >
+          <ShieldCheck className="w-3 h-3" />
+          {u.can_approve ? 'Can Approve' : 'No Approval'}
+        </button>
         <span className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full flex-shrink-0"
           style={{ background: cfg.bg, color: cfg.color }}>
           <Icon className="w-3 h-3" />

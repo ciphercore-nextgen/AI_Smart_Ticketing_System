@@ -56,9 +56,21 @@ export default function ReportsPage() {
       a.click()
       a.remove()
       window.URL.revokeObjectURL(url)
-    } catch (e) {
+    } catch (e: any) {
       console.error(e)
-      toast.error('Could not download PDF')
+      // responseType:'blob' means a JSON error body from the server also
+      // comes back as an unreadable Blob — read it as text to recover the
+      // real error message instead of always showing a generic one.
+      let detail = 'Could not download PDF'
+      if (e.response?.data instanceof Blob) {
+        try {
+          const text = await e.response.data.text()
+          detail = JSON.parse(text)?.detail || detail
+        } catch { /* not JSON, keep generic message */ }
+      } else {
+        detail = e.response?.data?.detail || detail
+      }
+      toast.error(detail)
     } finally {
       setDownloading(false)
     }

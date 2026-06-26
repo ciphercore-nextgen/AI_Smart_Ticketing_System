@@ -10,7 +10,7 @@ import uuid
 from app.db.session import get_db
 from app.core.deps import get_current_user, is_admin, is_agent
 from app.models.models import Ticket, TicketStatus, User, TicketComment, AuditLog
-from app.services.tickets.ticket_service import create_ticket, get_tickets_for_user
+from app.services.tickets.ticket_service import create_ticket, get_tickets_for_user, NotASupportRequestError
 from app.services.ai.groq_service import generate_ai_reply
 
 
@@ -69,6 +69,11 @@ def _ticket_to_dict(t: Ticket) -> dict:
         "self_help_resolved":   getattr(t, "self_help_resolved", None),
         "self_help_steps_done": getattr(t, "self_help_steps_done", None),
         "self_help_outcome_at": utc_iso(getattr(t, "self_help_outcome_at", None)),
+        "requires_approval": getattr(t, "requires_approval", False),
+        "approval_status":   getattr(t, "approval_status", None),
+        "approved_by_id":    getattr(t, "approved_by_id", None),
+        "approved_at":       utc_iso(getattr(t, "approved_at", None)),
+        "approval_note":     getattr(t, "approval_note", None),
         "created_at":      utc_iso(t.created_at),
         "updated_at":      utc_iso(t.updated_at),
         "resolved_at":     utc_iso(t.resolved_at),
@@ -158,7 +163,13 @@ async def create_new_ticket(
     if role_val not in ("employee", "admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Only employees can submit tickets")
 
-    ticket = await create_ticket(db, req.title, req.description, current_user.id)
+    try:
+        ticket = await create_ticket(db, req.title, req.description, current_user.id)
+    except NotASupportRequestError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{e.reason} Please submit issues related to IT, HR, Finance, or Operations.",
+        )
 
     db.add(AuditLog(
         id=str(uuid.uuid4()),
@@ -306,6 +317,97 @@ async def escalate_ticket(
         details={"reason": req.reason},
     ))
     return _ticket_to_dict(ticket)
+
+
+class ApprovalRequest(BaseModel):
+    note: Optional[str] = None
+
+
+@router.post("/{ticket_id}/approve")
+async def approve_ticket(
+    ticket_id:    str,
+    req:          ApprovalRequest,
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db),
+):
+    """Manager sign-off — the Employee → Manager Approval → Support Team flow."""
+    if not (current_user.can_approve or is_admin(current_user)):
+        raise HTTPException(status_code=403, detail="You don't have approval authority")
+
+    result = await db.execute(
+        select(Ticket).options(
+            selectinload(Ticket.department), selectinload(Ticket.submitter),
+            selectinload(Ticket.assigned_agent),
+        ).where(Ticket.id == ticket_id)
+    )
+    ticket = result.scalar_one_or_none()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if ticket.approval_status != "pending":
+        raise HTTPException(status_code=400, detail="This ticket has no pending approval")
+
+    ticket.approval_status = "approved"
+    ticket.approved_by_id  = current_user.id
+    ticket.approved_at     = datetime.now(timezone.utc)
+    ticket.approval_note   = req.note
+
+    db.add(TicketComment(
+        id=str(uuid.uuid4()), ticket_id=ticket.id, author_id=current_user.id,
+        content=req.note or "Approved — support team can proceed.",
+        is_internal=False, is_ai=False,
+    ))
+    db.add(AuditLog(
+        id=str(uuid.uuid4()), ticket_id=ticket.id, user_id=current_user.id,
+        action="ticket_approved", details={"note": req.note},
+    ))
+    await db.flush()
+    out = _ticket_to_dict(ticket)
+    out["approved_by"] = current_user.full_name
+    return out
+
+
+@router.post("/{ticket_id}/reject")
+async def reject_ticket(
+    ticket_id:    str,
+    req:          ApprovalRequest,
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db),
+):
+    if not (current_user.can_approve or is_admin(current_user)):
+        raise HTTPException(status_code=403, detail="You don't have approval authority")
+
+    result = await db.execute(
+        select(Ticket).options(
+            selectinload(Ticket.department), selectinload(Ticket.submitter),
+            selectinload(Ticket.assigned_agent),
+        ).where(Ticket.id == ticket_id)
+    )
+    ticket = result.scalar_one_or_none()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if ticket.approval_status != "pending":
+        raise HTTPException(status_code=400, detail="This ticket has no pending approval")
+
+    ticket.approval_status = "rejected"
+    ticket.approved_by_id  = current_user.id
+    ticket.approved_at     = datetime.now(timezone.utc)
+    ticket.approval_note   = req.note
+    ticket.status          = TicketStatus.closed
+    ticket.resolution_note = req.note or "Rejected at the approval step."
+
+    db.add(TicketComment(
+        id=str(uuid.uuid4()), ticket_id=ticket.id, author_id=current_user.id,
+        content=req.note or "This request was not approved.",
+        is_internal=False, is_ai=False,
+    ))
+    db.add(AuditLog(
+        id=str(uuid.uuid4()), ticket_id=ticket.id, user_id=current_user.id,
+        action="ticket_rejected", details={"note": req.note},
+    ))
+    await db.flush()
+    out = _ticket_to_dict(ticket)
+    out["approved_by"] = current_user.full_name
+    return out
 
 
 @router.post("/{ticket_id}/comments")

@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Ticket, BarChart3, Users, Settings,
   LogOut, Building2, Plus, Bell, Shield, FileText,
+  TrendingUp, Zap, Bot,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { authApi } from '@/lib/api'
@@ -42,6 +43,10 @@ const navByRole: Record<string, { href: string; icon: any; label: string }[]> = 
     { href: '/admin/departments', icon: Building2,       label: 'Departments' },
     { href: '/analytics/admin',   icon: BarChart3,       label: 'Analytics' },
     { href: '/admin/reports',     icon: FileText,        label: 'Reports' },
+    { href: '/admin/predictions', icon: TrendingUp,      label: 'Predictions' },
+    { href: '/admin/governance',  icon: Shield,          label: 'AI Governance' },
+    { href: '/admin/automation',  icon: Zap,             label: 'Automation' },
+    { href: '/admin/assistant',   icon: Bot,             label: 'AI Assistant' },
     { href: '/alerts',            icon: Bell,            label: 'Alerts' },
     { href: '/admin/settings',    icon: Settings,        label: 'Settings' },
   ],
@@ -52,6 +57,10 @@ const navByRole: Record<string, { href: string; icon: any; label: string }[]> = 
     { href: '/admin/departments', icon: Building2,       label: 'Departments' },
     { href: '/analytics/admin',   icon: BarChart3,       label: 'Analytics' },
     { href: '/admin/reports',     icon: FileText,        label: 'Reports' },
+    { href: '/admin/predictions', icon: TrendingUp,      label: 'Predictions' },
+    { href: '/admin/governance',  icon: Shield,          label: 'AI Governance' },
+    { href: '/admin/automation',  icon: Zap,             label: 'Automation' },
+    { href: '/admin/assistant',   icon: Bot,             label: 'AI Assistant' },
     { href: '/alerts',            icon: Bell,            label: 'Alerts' },
     { href: '/admin/settings',    icon: Settings,        label: 'Settings' },
   ],

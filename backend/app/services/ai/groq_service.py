@@ -92,6 +92,20 @@ RESOLVING AGENTS and their scopes:
 
 CRITICAL DISAMBIGUATION RULES — apply before assigning tokens:
 
+STEP 0 — IS THIS EVEN A LEGITIMATE SUPPORT REQUEST?
+Before routing anywhere, check whether this is a genuine workplace IT/HR/Finance/
+Operations issue at all. It is NOT a legitimate request if it's: general trivia or
+knowledge questions unrelated to work ("what colour is the sky", "who won the
+world cup"), a joke, a test/placeholder submission, or any question with no
+actual workplace problem to solve. Genuine requests — even vague, casual, or
+oddly-phrased ones — about something work-related (a tool, a process, a benefit,
+a payment, equipment, access, a workflow) ARE legitimate, even if the employee
+didn't name a specific system. When genuinely unsure, default to legitimate —
+only reject things that are CLEARLY unrelated to work. If illegitimate, set
+"is_support_request": false and explain briefly in "rejection_reason"; you can
+skip the remaining routing steps in that case (department/priority can be your
+best guess, they won't be used).
+
 STEP 1 — AI TOOLING CHECK (check this first, only if ticket explicitly names an AI product):
 Only route to ai_intern if the ticket contains one of these EXACT phrases or named products:
   "AI chatbot", "AI tool", "AI assistant", "AI chat", "Copilot", "ChatGPT", "GPT",
@@ -136,6 +150,8 @@ LOW (1 week): non-urgent, nice-to-have, future planning, distant leave request
 
 Respond ONLY with valid JSON — no markdown, no explanation:
 {
+  "is_support_request": <true|false>,
+  "rejection_reason": "<one sentence, only if is_support_request is false>",
   "department_slug": "<hr|it|finance|operations>",
   "department_name": "<full name>",
   "priority": "<critical|high|medium|low>",
@@ -251,6 +267,9 @@ async def classify_ticket(title: str, description: str) -> dict:
 
             if result.get("priority") not in {"critical", "high", "medium", "low"}:
                 result["priority"] = "medium"
+
+            if not isinstance(result.get("is_support_request"), bool):
+                result["is_support_request"] = True  # fail-open: malformed field shouldn't block a real ticket
 
             if not isinstance(result.get("skill_tokens"), list):
                 result["skill_tokens"] = _extract_fallback_tokens(title + " " + description)
@@ -721,6 +740,37 @@ def _apply_urgency_override(title: str, description: str, result: dict) -> None:
         result["urgency_override"] = True
 
 
+# Used only when Groq is unavailable — a plain AI judgment call on relevance
+# isn't possible, so this stays deliberately narrow (fail-open) to avoid
+# ever blocking a real ticket just because it's fallback mode. Only flags
+# the most obvious case: a trivia-style question with zero work-related
+# vocabulary anywhere in it.
+_WORK_SIGNAL_WORDS = [
+    "ticket", "system", "account", "pay", "salary", "payroll", "leave",
+    "benefit", "policy", "invoice", "budget", "expense", "vendor", "client",
+    "project", "deadline", "manager", "team", "office", "work", "company",
+    "employee", "hr ", "it ", "request", "issue", "problem", "broken",
+    "error", "access", "password", "report", "approve", "process", "login",
+    "vpn", "email", "software", "hardware", "device", "printer", "laptop",
+    "computer", "server", "network", "wifi", "onboarding", "training",
+    "reimburse", "timesheet", "schedule", "shift", "contract", "document",
+]
+_TRIVIA_OPENERS = [
+    "what is", "what's", "who is", "who was", "who won", "who invented",
+    "who created", "when did", "where is", "how many", "why does", "why is",
+    "what year", "what color", "what colour",
+]
+
+
+def _looks_like_non_work_trivia(text: str) -> bool:
+    lower = text.lower().strip()
+    if not any(lower.startswith(o) for o in _TRIVIA_OPENERS):
+        return False
+    if any(w in lower for w in _WORK_SIGNAL_WORDS):
+        return False
+    return len(lower.split()) <= 25  # short, simple question — not a real ticket description
+
+
 def _fallback_classify(title: str, description: str) -> dict:
     text = title + " " + description
     dept_slug = _keyword_dept(text)
@@ -729,8 +779,11 @@ def _fallback_classify(title: str, description: str) -> dict:
         "finance": "Finance", "operations": "Operations",
     }[dept_slug]
     tokens = _extract_fallback_tokens(text)
+    is_trivia = _looks_like_non_work_trivia(text)
 
     return {
+        "is_support_request": not is_trivia,
+        "rejection_reason":   "This doesn't look like a work-related support request." if is_trivia else "",
         "department_slug":  dept_slug,
         "department_name":  dept_name,
         "priority":         "medium",

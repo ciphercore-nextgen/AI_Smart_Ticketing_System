@@ -12,7 +12,7 @@ import toast from 'react-hot-toast'
 import {
   ArrowLeft, Cpu, Send, Clock, User, MessageSquare,
   AlertTriangle, CheckCircle, Sparkles, Play,
-  Loader, XCircle, Timer, Calendar, TrendingUp
+  Loader, XCircle, Timer, Calendar, TrendingUp, ShieldCheck
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useAuthStore } from '@/stores/authStore'
@@ -463,6 +463,15 @@ export default function TicketDetailPage() {
           </div>
         </div>
 
+        {/* Approval workflow banner */}
+        {ticket.approval_status === 'pending' && (
+          <ApprovalBanner
+            ticket={ticket}
+            canApprove={!!user?.can_approve || isAdmin}
+            onUpdated={(updated: any) => setTicket((prev: any) => ({ ...prev, ...updated }))}
+          />
+        )}
+
         {/* Self-help panel */}
         <SelfHelpPanel ticketId={id} autoLoad={!isAgentOrAdmin} readOnly={isAgentOrAdmin} />
 
@@ -625,5 +634,73 @@ export default function TicketDetailPage() {
 
       </div>
     </DashboardLayout>
+  )
+}
+
+
+function ApprovalBanner({ ticket, canApprove, onUpdated }: { ticket: any; canApprove: boolean; onUpdated: (t: any) => void }) {
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const handle = async (action: 'approve' | 'reject') => {
+    setBusy(true)
+    try {
+      const { data } = action === 'approve'
+        ? await ticketsApi.approve(ticket.id, note || undefined)
+        : await ticketsApi.reject(ticket.id, note || undefined)
+      onUpdated(data)
+      toast.success(action === 'approve' ? 'Ticket approved' : 'Ticket rejected')
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Action failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!canApprove) {
+    return (
+      <div className="rounded-xl border p-4 bg-amber-500/5 border-amber-500/25">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+            <ShieldCheck className="w-4 h-4 text-amber-400" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-amber-300">Awaiting Manager Approval</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              This ticket matched a rule requiring sign-off before support action begins.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl border p-4 bg-amber-500/5 border-amber-500/25 space-y-3">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+          <ShieldCheck className="w-4 h-4 text-amber-400" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-amber-300">Needs Your Approval</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            This ticket matched an automation rule — review and approve or reject before the support team proceeds.
+          </p>
+        </div>
+      </div>
+      <textarea
+        value={note} onChange={e => setNote(e.target.value)} rows={2}
+        placeholder="Optional note…"
+        className="input resize-none w-full"
+      />
+      <div className="flex gap-2">
+        <button onClick={() => handle('approve')} disabled={busy} className="btn btn-primary flex items-center gap-1.5">
+          <CheckCircle className="w-3.5 h-3.5" /> Approve
+        </button>
+        <button onClick={() => handle('reject')} disabled={busy} className="btn flex items-center gap-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/20">
+          <XCircle className="w-3.5 h-3.5" /> Reject
+        </button>
+      </div>
+    </div>
   )
 }

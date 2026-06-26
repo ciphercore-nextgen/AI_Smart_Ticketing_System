@@ -11,17 +11,28 @@ Flow:
 """
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
-from app.models.models import Ticket, TicketStatus, TicketPriority, User, Department, TicketComment
+from app.models.models import Ticket, TicketStatus, TicketPriority, User, Department, TicketComment, AutomationRule
 from app.services.ai.groq_service import classify_ticket, select_agent_for_ticket
 from app.services.ai.response_service import generate_auto_response
+from app.governance.governance_service import log_ai_action
 
 SLA_HOURS = {"critical": 4, "high": 24, "medium": 72, "low": 168}
 
 AGENT_ROLES = {"ai_intern", "it_support_technician", "junior_operations"}
+
+
+class NotASupportRequestError(Exception):
+    """Raised when classification determines this isn't a genuine work-related
+    support request — caught by the endpoint and turned into a 400 before any
+    routing, agent assignment, or DB write happens."""
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
 
 
 async def generate_ticket_number(db: AsyncSession) -> str:
@@ -44,6 +55,22 @@ async def create_ticket(
 
     # ── Stage 1: Tokenize & Classify ────────────────────────────────────────
     classification = await classify_ticket(title, description)
+
+    if classification.get("is_support_request", True) is False:
+        raise NotASupportRequestError(
+            classification.get("rejection_reason")
+            or "This doesn't look like a work-related support request."
+        )
+
+    await log_ai_action(
+        db, action="ticket_classification",
+        input_summary=f"{title} — {description}",
+        output_summary=f"dept={classification.get('department_slug')}, "
+                        f"priority={classification.get('priority')}, "
+                        f"category={classification.get('category')}",
+        user_id=submitter_id,
+        model_used=classification.get("classified_by", "groq"),
+    )
 
     dept_slug    = classification.get("department_slug", "it")
     priority_str = classification.get("priority", "medium")
@@ -88,6 +115,16 @@ async def create_ticket(
     )
     selected_agent_id = selection.get("selected_agent_id")
 
+    await log_ai_action(
+        db, action="agent_routing",
+        input_summary=f"Candidates: {[a['full_name'] for a in agent_dicts]}",
+        output_summary=f"Selected: {next((a['full_name'] for a in agent_dicts if a['id'] == selected_agent_id), 'none')} "
+                        f"— {selection.get('routing_rationale', '')}",
+        user_id=submitter_id,
+        model_used=selection.get("selected_by", "groq"),
+        run_bias_check=True,  # ranking/selecting among people — exactly what governance should watch
+    )
+
     # Merge selection details into classification result
     classification["routed_to_agent_id"]  = selected_agent_id
     classification["routing_rationale"]   = selection.get("routing_rationale", "")
@@ -107,6 +144,15 @@ async def create_ticket(
     except ValueError:
         priority = TicketPriority.medium
 
+    # ── Approval Workflow: does any active rule require sign-off first? ─────
+    rules_result = await db.execute(select(AutomationRule).where(AutomationRule.is_active == True))
+    rules = rules_result.scalars().all()
+    requires_approval = any(
+        (r.condition_type == "priority" and r.condition_value == priority_str) or
+        (r.condition_type == "department" and r.condition_value == dept_slug)
+        for r in rules
+    )
+
     sla_deadline = datetime.now(timezone.utc) + timedelta(hours=SLA_HOURS.get(priority_str, 72))
 
     ticket = Ticket(
@@ -121,10 +167,21 @@ async def create_ticket(
         ai_classification = classification,
         sla_deadline      = sla_deadline,
         sla_breached      = False,
+        requires_approval = requires_approval,
+        approval_status   = "pending" if requires_approval else None,
     )
 
     db.add(ticket)
     await db.flush()
+
+    if requires_approval:
+        db.add(TicketComment(
+            id=str(uuid.uuid4()), ticket_id=ticket.id, author_id=submitter_id,
+            content="This ticket matches a rule requiring manager approval before support action begins.",
+            is_internal=False, is_ai=True,
+        ))
+        await db.flush()
+        return await _reload_ticket(db, ticket.id)
 
     # ── Auto-Response: post first AI comment immediately ──────────────────────
     try:
@@ -151,6 +208,10 @@ async def create_ticket(
     except Exception as e:
         print(f"[AutoResponse] First-response failed: {e}")
 
+    return await _reload_ticket(db, ticket.id)
+
+
+async def _reload_ticket(db: AsyncSession, ticket_id: str) -> Ticket:
     result = await db.execute(
         select(Ticket)
         .options(
@@ -158,7 +219,7 @@ async def create_ticket(
             selectinload(Ticket.submitter),
             selectinload(Ticket.assigned_agent),
         )
-        .where(Ticket.id == ticket.id)
+        .where(Ticket.id == ticket_id)
     )
     return result.scalar_one()
 

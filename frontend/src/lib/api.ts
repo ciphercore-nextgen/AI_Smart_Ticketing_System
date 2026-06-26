@@ -97,6 +97,8 @@ export const ticketsApi = {
     api.patch(`/tickets/${id}/self-help-progress`, { steps_done: stepsDone }),
   selfHelpOutcome: (id: string, resolved: boolean, stepsDone: number[]) =>
     api.post(`/tickets/${id}/self-help-outcome`, { resolved, steps_done: stepsDone }),
+  approve: (id: string, note?: string) => api.post(`/tickets/${id}/approve`, { note }),
+  reject:  (id: string, note?: string) => api.post(`/tickets/${id}/reject`, { note }),
 }
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
@@ -107,6 +109,10 @@ export const adminApi = {
   systemStats:     ()                          => api.get('/admin/system-stats'),
   getSettings:     ()                          => api.get('/admin/settings'),
   updateSettings:  (data: any)                 => api.put('/admin/settings', data),
+  listAutomationRules:  ()                     => api.get('/admin/automation-rules'),
+  createAutomationRule: (data: any)            => api.post('/admin/automation-rules', data),
+  updateAutomationRule: (id: string, data: any)=> api.patch(`/admin/automation-rules/${id}`, data),
+  deleteAutomationRule: (id: string)           => api.delete(`/admin/automation-rules/${id}`),
 }
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
@@ -125,6 +131,27 @@ export const reportsApi = {
   // token (a plain <a href> to the API wouldn't carry it)
   weeklySummaryPdf: (department = 'all', days = 7) =>
     api.get(`/reports/weekly-summary/pdf?department=${department}&days=${days}`, { responseType: 'blob' }),
+}
+
+// ─── Predictions ──────────────────────────────────────────────────────────────
+export const predictionsApi = {
+  forecast: (department = 'all', historyDays = 30, forecastDays = 7) =>
+    api.get(`/predictions/forecast?department=${department}&history_days=${historyDays}&forecast_days=${forecastDays}`),
+}
+
+// ─── AI Governance ────────────────────────────────────────────────────────────
+export const governanceApi = {
+  checkBias:    (inputText: string, outputText = '') =>
+    api.post('/governance/check-bias', { input_text: inputText, output_text: outputText }),
+  listLogs:     (days = 7, risk = 'all') => api.get(`/governance/logs?days=${days}&risk=${risk}`),
+  createReport: (periodDays = 7)         => api.post(`/governance/risk-report?period_days=${periodDays}`),
+  listReports:  ()                       => api.get('/governance/risk-reports'),
+}
+
+// ─── AI Assistant ─────────────────────────────────────────────────────────────
+export const assistantApi = {
+  ask: (question: string, department = 'all') =>
+    api.post('/assistant/ask', { question, department }),
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

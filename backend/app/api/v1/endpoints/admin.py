@@ -8,7 +8,7 @@ import uuid
 
 from app.db.session import get_db
 from app.core.deps import get_current_user, require_roles
-from app.models.models import User, Department, UserRole
+from app.models.models import User, Department, UserRole, AutomationRule
 from app.services.auth.auth_service import hash_password
 
 
@@ -41,6 +41,7 @@ def _user_dict(u: User) -> dict:
         "agent_role_key":    u.agent_role_key,
         "job_title":         u.job_title,
         "is_active":         u.is_active,
+        "can_approve":       getattr(u, "can_approve", False),
         "created_at":        utc_iso(u.created_at),
     }
 
@@ -106,7 +107,7 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    for field in ("full_name", "job_title", "agent_role_key", "agent_departments", "is_active"):
+    for field in ("full_name", "job_title", "agent_role_key", "agent_departments", "is_active", "can_approve"):
         if field in req:
             setattr(user, field, req[field])
 
@@ -191,3 +192,73 @@ async def get_settings(_: User = Depends(AdminOnly)):
 @router.put("/settings")
 async def update_settings(payload: dict, _: User = Depends(AdminOnly)):
     return _write_settings(payload)
+
+
+# ─── Automation Rules (Approval Workflow) ─────────────────────────────────────
+
+class AutomationRuleRequest(BaseModel):
+    name: str
+    condition_type: str    # "priority" | "department"
+    condition_value: str
+    is_active: bool = True
+
+
+@router.get("/automation-rules")
+async def list_automation_rules(_: User = Depends(AdminOnly), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(AutomationRule).order_by(AutomationRule.created_at.desc()))
+    return [
+        {
+            "id": r.id, "name": r.name, "condition_type": r.condition_type,
+            "condition_value": r.condition_value, "action": r.action,
+            "is_active": r.is_active,
+        }
+        for r in result.scalars().all()
+    ]
+
+
+@router.post("/automation-rules")
+async def create_automation_rule(
+    req: AutomationRuleRequest,
+    _:   User = Depends(AdminOnly),
+    db:  AsyncSession = Depends(get_db),
+):
+    rule = AutomationRule(
+        id=str(uuid.uuid4()), name=req.name, condition_type=req.condition_type,
+        condition_value=req.condition_value, is_active=req.is_active,
+    )
+    db.add(rule)
+    await db.flush()
+    return {"id": rule.id}
+
+
+@router.patch("/automation-rules/{rule_id}")
+async def update_automation_rule(
+    rule_id: str,
+    req: AutomationRuleRequest,
+    _:   User = Depends(AdminOnly),
+    db:  AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(AutomationRule).where(AutomationRule.id == rule_id))
+    rule = result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    rule.name = req.name
+    rule.condition_type = req.condition_type
+    rule.condition_value = req.condition_value
+    rule.is_active = req.is_active
+    await db.flush()
+    return {"id": rule.id}
+
+
+@router.delete("/automation-rules/{rule_id}")
+async def delete_automation_rule(
+    rule_id: str,
+    _:  User = Depends(AdminOnly),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(AutomationRule).where(AutomationRule.id == rule_id))
+    rule = result.scalar_one_or_none()
+    if rule:
+        await db.delete(rule)
+        await db.flush()
+    return {"deleted": True}

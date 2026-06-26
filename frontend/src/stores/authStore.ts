@@ -12,6 +12,7 @@ interface User {
   agent_departments?: string[]
   agent_role_key?: string
   job_title?: string
+  can_approve?: boolean
 }
 
 interface AuthState {

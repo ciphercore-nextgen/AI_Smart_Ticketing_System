@@ -102,6 +102,13 @@ async def _migrate_columns(conn):
         # the SAME steps (and lets "step 3 was checked" stay meaningful)
         # instead of silently regenerating a different set every load.
         ("tickets", "self_help_content",     "JSON"),
+        # Approval workflow
+        ("tickets", "requires_approval",     "BOOLEAN DEFAULT 0"),
+        ("tickets", "approval_status",       "VARCHAR(20)"),
+        ("tickets", "approved_by_id",        "VARCHAR(36)"),
+        ("tickets", "approved_at",           "DATETIME"),
+        ("tickets", "approval_note",         "TEXT"),
+        ("users",   "can_approve",           "BOOLEAN DEFAULT 0"),
     ]
     for table, column, col_def in new_columns:
         try:
