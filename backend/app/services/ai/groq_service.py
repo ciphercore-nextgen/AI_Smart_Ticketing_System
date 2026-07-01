@@ -457,6 +457,20 @@ _AUTOMATION_HARD_SIGNALS = [
     "power automate", "zapier", "make.com", "integration not", "not triggering",
     "leave workflow", "onboarding workflow", "offboarding workflow",
     "erp workflow", "provisioning workflow",
+    # A recurring automated business process that silently failed is a
+    # scheduled-job failure conceptually, even when nobody used the word
+    # "workflow" or "scheduled job" — payroll is the clearest example:
+    # an overnight batch run that didn't happen. Without these, a ticket
+    # like "payroll wasn't processed overnight" reads as a Finance/reporting
+    # request to a token-matcher (it shares vocabulary with ai_intern's
+    # "financial_report" tokens) instead of the automation failure it is.
+    "payroll not processed", "payroll wasn't processed", "payroll was not processed",
+    "payroll failed", "payroll didn't run", "payroll did not run",
+    "salaries not processed", "salaries were not paid", "salaries not paid",
+    "overnight process", "overnight job", "overnight run", "overnight batch",
+    "batch job", "batch process", "didn't run overnight", "did not run overnight",
+    "failed to process overnight", "failed to run overnight",
+    "automatically generate", "auto-generated report failed",
 ]
 
 _DATA_HARD_SIGNALS = [
@@ -708,6 +722,15 @@ _URGENCY_CRITICAL_SIGNALS = [
     "cannot work at all", "can't work at all", "dead in the water",
     "everyone is affected", "entire team is blocked", "whole team is blocked",
     "business critical", "mission critical",
+    # The classification prompt's own priority rules (below) already name
+    # "payroll not processed" as a CRITICAL trigger — this override makes
+    # sure that's actually enforced rather than just stated, the same way
+    # the IT-routing override backs up STEP 2 instead of trusting the model
+    # to apply every rule perfectly every time.
+    "payroll not processed", "payroll wasn't processed", "payroll was not processed",
+    "payroll failed", "payroll didn't run", "payroll did not run",
+    "salaries not processed", "salaries not paid", "salaries were not paid",
+    "employees have not received their salaries", "didn't get paid", "did not get paid",
 ]
 
 
