@@ -287,6 +287,21 @@ async def classify_ticket(title: str, description: str) -> dict:
     # fallback) might miss explicit urgency language the employee used, so
     # this is a deterministic safety net on top, not a replacement for it.
     _apply_urgency_override(title, description, result)
+
+    # Deterministic trivia gate — runs after EVERY path (Groq success,
+    # Groq exception, or no-key fallback). The AI gets the final word on
+    # ambiguous cases (a real ticket phrased as a question), but for cases
+    # that pass the narrow trivia heuristic (short, clearly-not-work question
+    # with zero workplace vocabulary) we override regardless of what Groq
+    # decided — because Groq is non-deterministic at temperature 0.05 and
+    # will occasionally flip its answer on a retry, letting junk through.
+    if _looks_like_non_work_trivia(title + " " + description):
+        result["is_support_request"] = False
+        result["rejection_reason"] = (
+            result.get("rejection_reason")
+            or "This doesn't look like a work-related support request."
+        )
+
     return result
 
 
