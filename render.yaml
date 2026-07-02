@@ -7,9 +7,10 @@ services:
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
     envVars:
       - key: DATABASE_URL
-        value: sqlite+aiosqlite:///./ticketiq.db
+        value: sqlite+aiosqlite:///./data/ticketiq.db
       - key: SECRET_KEY
         generateValue: true
       - key: GROQ_API_KEY
@@ -17,4 +18,18 @@ services:
       - key: APP_ENV
         value: production
       - key: CORS_ORIGINS
-        value: https://your-frontend.vercel.app
+        value: "*"
+      - key: ALLOWED_HOSTS
+        value: "*"
+
+  - type: web
+    name: ticketiq-frontend
+    env: node
+    region: oregon
+    plan: free
+    rootDir: frontend
+    buildCommand: npm ci; npm run build
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://ticketiq-backend.render.com/api/v1
