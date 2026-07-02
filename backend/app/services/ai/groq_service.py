@@ -295,7 +295,7 @@ async def classify_ticket(title: str, description: str) -> dict:
     # with zero workplace vocabulary) we override regardless of what Groq
     # decided — because Groq is non-deterministic at temperature 0.05 and
     # will occasionally flip its answer on a retry, letting junk through.
-    if _looks_like_non_work_trivia(title + " " + description):
+    if _looks_like_non_work_trivia(title + " " + description, title=title):
         result["is_support_request"] = False
         result["rejection_reason"] = (
             result.get("rejection_reason")
@@ -800,13 +800,34 @@ _TRIVIA_OPENERS = [
 ]
 
 
-def _looks_like_non_work_trivia(text: str) -> bool:
-    lower = text.lower().strip()
-    if not any(lower.startswith(o) for o in _TRIVIA_OPENERS):
-        return False
-    if any(w in lower for w in _WORK_SIGNAL_WORDS):
-        return False
-    return len(lower.split()) <= 25  # short, simple question — not a real ticket description
+def _looks_like_non_work_trivia(text: str, title: str = "") -> bool:
+    """
+    Returns True if this is clearly a non-work question (trivia, general knowledge)
+    with no workplace vocabulary anywhere in the combined title + description.
+
+    Checks the title independently first (no word-count limit) since the title
+    alone often contains the entire trivia question, and a longer description
+    shouldn't be able to bypass the gate just by having more words.
+    Then checks the full combined text with a slightly relaxed limit.
+    """
+    full_lower  = text.lower().strip()
+    title_lower = (title or text).lower().strip()
+
+    has_work = any(w in full_lower for w in _WORK_SIGNAL_WORDS)
+    if has_work:
+        return False  # work vocabulary anywhere → not trivia, always let through
+
+    # Check title alone first — a trivia-opener title with no work words is always caught
+    title_is_trivia = any(title_lower.startswith(o) for o in _TRIVIA_OPENERS)
+    if title_is_trivia:
+        return True
+
+    # Check full combined text — catch cases where the title isn't a question
+    # but the description is ("sky color question" / "what color is the sky")
+    if any(full_lower.startswith(o) for o in _TRIVIA_OPENERS) and len(full_lower.split()) <= 40:
+        return True
+
+    return False
 
 
 def _fallback_classify(title: str, description: str) -> dict:
@@ -817,7 +838,7 @@ def _fallback_classify(title: str, description: str) -> dict:
         "finance": "Finance", "operations": "Operations",
     }[dept_slug]
     tokens = _extract_fallback_tokens(text)
-    is_trivia = _looks_like_non_work_trivia(text)
+    is_trivia = _looks_like_non_work_trivia(text, title=title)
 
     return {
         "is_support_request": not is_trivia,
