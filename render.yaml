@@ -21,6 +21,8 @@ services:
         value: "*"
       - key: ALLOWED_HOSTS
         value: "*"
+      - key: PYTHONUNBUFFERED
+        value: "1"
 
   - type: web
     name: ticketiq-frontend
