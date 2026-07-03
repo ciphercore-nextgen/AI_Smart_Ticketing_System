@@ -19,7 +19,7 @@ from sqlalchemy.orm import selectinload
 from app.models.models import Ticket, TicketStatus, TicketPriority, User, Department, TicketComment, AutomationRule
 from app.services.ai.groq_service import classify_ticket, select_agent_for_ticket
 from app.services.ai.response_service import generate_auto_response
-from app.services.governance.governance_service import log_ai_action
+from app.governance.governance_service import log_ai_action
 
 SLA_HOURS = {"critical": 4, "high": 24, "medium": 72, "low": 168}
 
