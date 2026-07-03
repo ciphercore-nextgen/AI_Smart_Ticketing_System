@@ -5,8 +5,8 @@ Routing is governed by the Enterprise Simulation Rules document.
 
 THREE AGENTS, STRICT SCOPES:
   it_support_technician  — passwords, devices, access, connectivity, hardware/software
-  ai_intern              — reports, data analysis, dashboards, research, documentation
-  junior_operations      — workflow failures, automation, scheduled jobs, integrations
+  ai_intern               — reports, data analysis, dashboards, research, documentation
+  junior_operations       — workflow failures, automation, scheduled jobs, integrations
 
 FOUR DEPARTMENTS (submit only — never resolve):
   HR, IT, Finance, Operations
@@ -805,10 +805,15 @@ def _looks_like_non_work_trivia(text: str, title: str = "") -> bool:
     Returns True if this is clearly a non-work question (trivia, general knowledge)
     with no workplace vocabulary anywhere in the combined title + description.
 
-    Checks the title independently first (no word-count limit) since the title
-    alone often contains the entire trivia question, and a longer description
-    shouldn't be able to bypass the gate just by having more words.
-    Then checks the full combined text with a slightly relaxed limit.
+    FIX: previously used `startswith`, which meant a trivia phrase anywhere
+    other than position 0 of the string was missed entirely — e.g. title
+    "color" + description "what colour is the sky" combines into
+    "color what colour is the sky", which does NOT start with "what colour",
+    so the old check silently let it through. Switched to substring (`in`)
+    matching so the opener phrase is caught anywhere in the text, not just
+    at the very start. The `_WORK_SIGNAL_WORDS` check still runs first and
+    exempts anything with real workplace vocabulary, so this stays safe
+    against false-positiving genuine tickets.
     """
     full_lower  = text.lower().strip()
     title_lower = (title or text).lower().strip()
@@ -817,14 +822,17 @@ def _looks_like_non_work_trivia(text: str, title: str = "") -> bool:
     if has_work:
         return False  # work vocabulary anywhere → not trivia, always let through
 
-    # Check title alone first — a trivia-opener title with no work words is always caught
-    title_is_trivia = any(title_lower.startswith(o) for o in _TRIVIA_OPENERS)
+    # Check title alone first — catches a trivia-opener anywhere in the title,
+    # not just at the start (e.g. title "quick one - what colour is the sky")
+    title_is_trivia = any(o in title_lower for o in _TRIVIA_OPENERS)
     if title_is_trivia:
         return True
 
-    # Check full combined text — catch cases where the title isn't a question
-    # but the description is ("sky color question" / "what color is the sky")
-    if any(full_lower.startswith(o) for o in _TRIVIA_OPENERS) and len(full_lower.split()) <= 40:
+    # Check full combined text — catches cases where the title isn't the
+    # question but the description is, or where title + description combine
+    # to bury the opener phrase mid-string (e.g. title "color" + description
+    # "what colour is the sky" → "color what colour is the sky")
+    if any(o in full_lower for o in _TRIVIA_OPENERS) and len(full_lower.split()) <= 40:
         return True
 
     return False
